@@ -24,7 +24,7 @@
           <h1>Chord Keypad</h1>
           <button id="help-btn" aria-label="Help">?</button>
         </div>
-        <p>Press keys 1-7 to play chords in the scale</p>
+        <p></p>
       </header>
 
       <div class="controls">
@@ -49,6 +49,10 @@
           <input type="checkbox" id="voice-leading-toggle" checked />
           <label for="voice-leading-toggle">Enable Voice Leading</label>
         </div>
+        <div class="toggle-control">
+          <input type="checkbox" id="numpad-mode-toggle" />
+          <label for="numpad-mode-toggle">Visual Numpad Layout</label>
+        </div>
       </div>
 
       <div class="display">
@@ -64,81 +68,172 @@
         </div>
       </div>
 
-      <div class="keypad">
-        <div class="key" data-note="1">
-          1
-          <div>I</div>
+      <!-- Default Interface (Horizontal Keys + Instructions) -->
+      <div id="default-interface">
+        <div class="keypad">
+          <div class="key" data-note="1">
+            1
+            <div>I</div>
+          </div>
+          <div class="key" data-note="2">
+            2
+            <div>ii</div>
+          </div>
+          <div class="key" data-note="3">
+            3
+            <div>iii</div>
+          </div>
+          <div class="key" data-note="4">
+            4
+            <div>IV</div>
+          </div>
+          <div class="key" data-note="5">
+            5
+            <div>V</div>
+          </div>
+          <div class="key" data-note="6">
+            6
+            <div>vi</div>
+          </div>
+          <div class="key" data-note="7">
+            7
+            <div>vii°</div>
+          </div>
         </div>
-        <div class="key" data-note="2">
-          2
-          <div>ii</div>
-        </div>
-        <div class="key" data-note="3">
-          3
-          <div>iii</div>
-        </div>
-        <div class="key" data-note="4">
-          4
-          <div>IV</div>
-        </div>
-        <div class="key" data-note="5">
-          5
-          <div>V</div>
-        </div>
-        <div class="key" data-note="6">
-          6
-          <div>vi</div>
-        </div>
-        <div class="key" data-note="7">
-          7
-          <div>vii°</div>
+
+        <div class="instructions">
+          <h3>Modifiers (Hold + Key)</h3>
+          <div class="modifier-grid">
+            <div class="mod-item" id="mod-major">
+              <span class="key-badge">⏎</span> <span>Major Triad</span>
+            </div>
+            <div class="mod-item" id="mod-minor">
+              <span class="key-badge">-</span> <span>Minor Triad</span>
+            </div>
+            <div class="mod-item" id="mod-dominant">
+              <span class="key-badge">d</span> <span class="key-badge">/</span>
+              <span>Dominant 7th</span>
+            </div>
+            <div class="mod-item" id="mod-majorSixth">
+              <span class="key-badge">s</span> <span class="key-badge">8</span>
+              <span>Major 6th</span>
+            </div>
+            <div class="mod-item" id="mod-majorSeventh">
+              <span class="key-badge">m</span> <span class="key-badge">9</span>
+              <span>Major 7th</span>
+            </div>
+            <div class="mod-item" id="mod-diminished">
+              <span class="key-badge">o</span> <span class="key-badge">*</span>
+              <span>Diminished 7th</span>
+            </div>
+            <div class="mod-item" id="mod-augmented">
+              <span class="key-badge">+</span> <span class="key-badge">=</span>
+              <span>Augmented 7th</span>
+            </div>
+            <div class="mod-item" id="mod-halfDiminished">
+              <span class="key-badge">␛</span> <span class="key-badge">␡</span>
+              <span>Half-Diminished</span>
+            </div>
+          </div>
+          <h3>Root Note Modifiers (Hold + Key)</h3>
+          <div class="modifier-grid">
+            <div class="mod-item" id="mod-rootShiftDown">
+              <span class="key-badge">,</span> <span class="key-badge">0</span>
+              <span>Flat Root (b)</span>
+            </div>
+            <div class="mod-item" id="mod-rootShiftUp">
+              <span class="key-badge">.</span> <span class="key-badge">></span>
+              <span>Sharp Root (#)</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="instructions">
-        <h3>Modifiers (Hold + Key)</h3>
-        <div class="modifier-grid">
-          <div class="mod-item" id="mod-major">
-            <span class="key-badge">⏎</span> <span>Major Triad</span>
-          </div>
-          <div class="mod-item" id="mod-minor">
-            <span class="key-badge">-</span> <span>Minor Triad</span>
-          </div>
-          <div class="mod-item" id="mod-dominant">
-            <span class="key-badge">d</span> <span class="key-badge">/</span>
-            <span>Dominant 7th</span>
-          </div>
-          <div class="mod-item" id="mod-majorSixth">
-            <span class="key-badge">s</span> <span class="key-badge">8</span>
-            <span>Major 6th</span>
-          </div>
-          <div class="mod-item" id="mod-majorSeventh">
-            <span class="key-badge">m</span> <span class="key-badge">9</span>
-            <span>Major 7th</span>
-          </div>
-          <div class="mod-item" id="mod-diminished">
-            <span class="key-badge">o</span> <span class="key-badge">*</span>
-            <span>Diminished 7th</span>
-          </div>
-          <div class="mod-item" id="mod-augmented">
-            <span class="key-badge">+</span> <span class="key-badge">=</span>
-            <span>Augmented 7th</span>
-          </div>
-          <div class="mod-item" id="mod-halfDiminished">
-            <span class="key-badge">␛</span> <span class="key-badge">␡</span>
-            <span>Half-Diminished</span>
-          </div>
-        </div>
-        <h3>Root Note Modifiers (Hold + Key)</h3>
-        <div class="modifier-grid">
-          <div class="mod-item" id="mod-rootShiftDown">
-            <span class="key-badge">,</span> <span class="key-badge">0</span>
-            <span>Flat Root (b)</span>
-          </div>
-          <div class="mod-item" id="mod-rootShiftUp">
-            <span class="key-badge">.</span> <span class="key-badge">></span>
-            <span>Sharp Root (#)</span>
-          </div>
+      <!-- Alternate Numpad Interface (Hidden by Default) -->
+      <div id="numpad-interface" style="display: none">
+        <div class="numpad-grid">
+          <!-- Row 1 -->
+          <button
+            class="np-btn btn-qual"
+            id="np-halfDiminished"
+            title="Half-Diminished (Clear)"
+          >
+            Ø
+          </button>
+          <button
+            class="np-btn btn-qual"
+            id="np-dominant"
+            title="Dominant 7th (/)"
+          >
+            7
+          </button>
+          <button
+            class="np-btn btn-qual"
+            id="np-diminished"
+            title="Diminished 7th (*)"
+          >
+            Dim 7
+          </button>
+          <button class="np-btn btn-qual" id="np-minor" title="Minor Triad (-)">
+            Minor
+          </button>
+
+          <!-- Row 2 -->
+          <button class="np-btn" id="np-key-7" data-note="7">vii°</button>
+          <button
+            class="np-btn btn-qual"
+            id="np-majorSixth"
+            title="Major 6th (8)"
+          >
+            Maj 6
+          </button>
+          <button
+            class="np-btn btn-qual"
+            id="np-majorSeventh"
+            title="Major 7th (9)"
+          >
+            Maj 7
+          </button>
+          <button
+            class="np-btn btn-qual tall-y"
+            id="np-augmented"
+            title="Augmented (+)"
+          >
+            Aug
+          </button>
+
+          <!-- Row 3 -->
+          <button class="np-btn" id="np-key-4" data-note="4">IV</button>
+          <button class="np-btn" id="np-key-5" data-note="5">V</button>
+          <button class="np-btn" id="np-key-6" data-note="6">vi</button>
+
+          <!-- Row 4 -->
+          <button class="np-btn" id="np-key-1" data-note="1">I</button>
+          <button class="np-btn" id="np-key-2" data-note="2">ii</button>
+          <button class="np-btn" id="np-key-3" data-note="3">iii</button>
+          <button
+            class="np-btn btn-qual tall-y"
+            id="np-major"
+            title="Major Triad (Enter)"
+          >
+            Major
+          </button>
+
+          <!-- Row 5 -->
+          <button
+            class="np-btn btn-root wide-x"
+            id="np-rootShiftDown"
+            title="Root Flat (0)"
+          >
+            ♭
+          </button>
+          <button
+            class="np-btn btn-root"
+            id="np-rootShiftUp"
+            title="Root Sharp (.)"
+          >
+            ♯
+          </button>
         </div>
       </div>
     </div>

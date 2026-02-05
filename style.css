@@ -125,6 +125,176 @@ body {
   background: transparent;
 }
 
+/* Alternate Numpad Layout */
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 70px);
+  gap: 12px;
+  margin-top: 1rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  background: #181818;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+
+  /* Explicit Grid Areas */
+  grid-template-areas:
+    "clear div mul sub"
+    "k7    k8  k9  add"
+    "k4    k5  k6  add"
+    "k1    k2  k3  ent"
+    "k0    k0  dot ent";
+}
+
+/* Color Coding Groups */
+.np-btn.btn-qual {
+  background: #3b4d3d; /* Braun Green */
+  border-color: #4b5d4d;
+}
+.np-btn.btn-root {
+  background: #4a2c25; /* Muted Rust */
+  border-color: #5a3c35;
+}
+
+.np-btn {
+  background: #252525; /* Keycap color */
+  border: none;
+  border-radius: 6px;
+  color: #eee;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.05s ease-out;
+  user-select: none;
+  text-align: center;
+  padding: 5px;
+
+  /* Pseudo-3D Bevel */
+  box-shadow:
+    0 -1px 0 #3a3a3a inset,
+    /* Highlight top edge */ 0 4px 0 #111,
+    /* Side depth */ 0 5px 5px rgba(0, 0, 0, 0.4); /* Drop shadow */
+  position: relative;
+  top: 0;
+}
+
+.np-btn:active,
+.np-btn.active {
+  transform: translateY(3px);
+  box-shadow:
+    0 -1px 0 #333 inset,
+    0 1px 0 #111,
+    0 1px 2px rgba(0, 0, 0, 0.4);
+
+  color: var(--primary-color);
+  background: #2a2a2a;
+  border: 1px solid var(--primary-color);
+}
+
+/* Specific Active States for Colored Keys */
+.np-btn.btn-qual:active,
+.np-btn.btn-qual.active {
+  background: #465a48; /* Slightly lighter Braun Green */
+  border-color: #566a58;
+  color: #fff;
+  box-shadow:
+    0 -1px 0 #3b4d3d inset,
+    0 1px 0 #333,
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.np-btn.btn-root:active,
+.np-btn.btn-root.active {
+  background: #5a352d; /* Slightly lighter Rust */
+  border-color: #6a453d;
+  color: #fff;
+  box-shadow:
+    0 -1px 0 #4a2c25 inset,
+    0 1px 0 #333,
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Modifiers Glow */
+.np-btn.active {
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.25);
+}
+
+/* Grid Area Assignments */
+#np-halfDiminished {
+  grid-area: clear;
+}
+#np-dominant {
+  grid-area: div;
+}
+#np-diminished {
+  grid-area: mul;
+}
+#np-minor {
+  grid-area: sub;
+}
+
+#np-key-7 {
+  grid-area: k7;
+}
+#np-majorSixth {
+  grid-area: k8;
+}
+#np-majorSeventh {
+  grid-area: k9;
+}
+#np-augmented {
+  grid-area: add;
+  height: 100%;
+}
+
+#np-key-4 {
+  grid-area: k4;
+}
+#np-key-5 {
+  grid-area: k5;
+}
+#np-key-6 {
+  grid-area: k6;
+}
+
+#np-key-1 {
+  grid-area: k1;
+}
+#np-key-2 {
+  grid-area: k2;
+}
+#np-key-3 {
+  grid-area: k3;
+}
+#np-major {
+  grid-area: ent;
+  height: 100%;
+}
+
+#np-rootShiftDown {
+  grid-area: k0;
+  width: 100%;
+}
+#np-rootShiftUp {
+  grid-area: dot;
+}
+
+/* Deprecated helpers (handled by grid-area) */
+.tall-y {
+  grid-row: auto;
+  height: auto;
+}
+.wide-x {
+  grid-column: auto;
+  width: auto;
+}
+
 #app {
   text-align: center;
   max-width: 600px;

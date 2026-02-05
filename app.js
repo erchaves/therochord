@@ -304,6 +304,8 @@ function startChord(degreeIndex) {
   updateDisplay(chord, simpleVoicing);
   const keyEl = document.querySelector(`.key[data-note="${degreeIndex + 1}"]`);
   if (keyEl) keyEl.classList.add("active");
+  const npBtn = document.querySelector(`.np-btn[data-note="${degreeIndex + 1}"]`);
+  if (npBtn) npBtn.classList.add("active");
 }
 
 // Stop Chord (Release)
@@ -317,6 +319,8 @@ function stopChord(degreeIndex) {
 
     const keyEl = document.querySelector(`.key[data-note="${degreeIndex + 1}"]`);
     if (keyEl) keyEl.classList.remove("active");
+    const npBtn = document.querySelector(`.np-btn[data-note="${degreeIndex + 1}"]`);
+    if (npBtn) npBtn.classList.remove("active");
   }
 }
 
@@ -451,6 +455,24 @@ function changeGlobalKey(direction) {
   updateActiveChords();
 }
 
+// Helper for UI updates
+function updateModifierUI(modName, isActive) {
+  const badgeEl = document.getElementById(`mod-${modName}`);
+  if (badgeEl) isActive ? badgeEl.classList.add("active") : badgeEl.classList.remove("active");
+
+  const npBtn = document.getElementById(`np-${modName}`);
+  if (npBtn) isActive ? npBtn.classList.add("active") : npBtn.classList.remove("active");
+}
+
+// Set Modifier State (for Mouse/Touch)
+function setModifier(modName, isActive) {
+  appState.modifiers[modName] = isActive;
+  updateModifierUI(modName, isActive);
+
+  // Immediate update for mouse interaction
+  updateActiveChords();
+}
+
 // Event Listeners
 document.getElementById("start-audio").addEventListener("click", () => {
   initAudio();
@@ -486,6 +508,22 @@ document.getElementById("root-note").addEventListener("change", (e) => {
 document.getElementById("voice-leading-toggle").addEventListener("change", (e) => {
   appState.voiceLeadingEnabled = e.target.checked;
   e.target.blur(); // Remove focus
+});
+
+document.getElementById("numpad-mode-toggle").addEventListener("change", (e) => {
+  const isNumpad = e.target.checked;
+  e.target.blur();
+
+  const defaultInterface = document.getElementById("default-interface");
+  const numpadInterface = document.getElementById("numpad-interface");
+
+  if (isNumpad) {
+    defaultInterface.style.display = 'none';
+    numpadInterface.style.display = 'block';
+  } else {
+    defaultInterface.style.display = 'block';
+    numpadInterface.style.display = 'none';
+  }
 });
 
 
@@ -552,16 +590,17 @@ window.addEventListener("keydown", (e) => {
   }
 
   // Modifiers tracking
-  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = true; modChanged = true; document.getElementById("mod-dominant").classList.add("active"); }
-  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = true; modChanged = true; document.getElementById("mod-minor").classList.add("active"); }
-  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = true; modChanged = true; document.getElementById("mod-diminished").classList.add("active"); }
-  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = true; modChanged = true; document.getElementById("mod-majorSixth").classList.add("active"); }
-  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = true; modChanged = true; document.getElementById("mod-augmented").classList.add("active"); }
-  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = true; modChanged = true; document.getElementById("mod-rootShiftDown").classList.add("active"); }
-  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = true; modChanged = true; document.getElementById("mod-rootShiftUp").classList.add("active"); }
-  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = true; modChanged = true; document.getElementById("mod-majorSeventh").classList.add("active"); }
-  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = true; modChanged = true; document.getElementById("mod-halfDiminished").classList.add("active"); }
-  if (majorModifiers.includes(e.key)) { appState.modifiers.major = true; modChanged = true; document.getElementById("mod-major").classList.add("active"); }
+  // Modifiers tracking
+  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = true; modChanged = true; updateModifierUI("dominant", true); }
+  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = true; modChanged = true; updateModifierUI("minor", true); }
+  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = true; modChanged = true; updateModifierUI("diminished", true); }
+  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = true; modChanged = true; updateModifierUI("majorSixth", true); }
+  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = true; modChanged = true; updateModifierUI("augmented", true); }
+  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = true; modChanged = true; updateModifierUI("rootShiftDown", true); }
+  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = true; modChanged = true; updateModifierUI("rootShiftUp", true); }
+  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = true; modChanged = true; updateModifierUI("majorSeventh", true); }
+  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = true; modChanged = true; updateModifierUI("halfDiminished", true); }
+  if (majorModifiers.includes(e.key)) { appState.modifiers.major = true; modChanged = true; updateModifierUI("major", true); }
 
   // Hot-Swap: if modifiers changed, update held chords
   if (modChanged) {
@@ -591,16 +630,16 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   let modChanged = false;
   // Modifiers tracking
-  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = false; modChanged = true; document.getElementById("mod-dominant").classList.remove("active"); }
-  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = false; modChanged = true; document.getElementById("mod-minor").classList.remove("active"); }
-  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = false; modChanged = true; document.getElementById("mod-diminished").classList.remove("active"); }
-  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = false; modChanged = true; document.getElementById("mod-majorSixth").classList.remove("active"); }
-  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = false; modChanged = true; document.getElementById("mod-augmented").classList.remove("active"); }
-  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = false; modChanged = true; document.getElementById("mod-rootShiftDown").classList.remove("active"); }
-  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = false; modChanged = true; document.getElementById("mod-rootShiftUp").classList.remove("active"); }
-  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = false; modChanged = true; document.getElementById("mod-majorSeventh").classList.remove("active"); }
-  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = false; modChanged = true; document.getElementById("mod-halfDiminished").classList.remove("active"); }
-  if (majorModifiers.includes(e.key)) { appState.modifiers.major = false; modChanged = true; document.getElementById("mod-major").classList.remove("active"); }
+  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = false; modChanged = true; updateModifierUI("dominant", false); }
+  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = false; modChanged = true; updateModifierUI("minor", false); }
+  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = false; modChanged = true; updateModifierUI("diminished", false); }
+  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = false; modChanged = true; updateModifierUI("majorSixth", false); }
+  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = false; modChanged = true; updateModifierUI("augmented", false); }
+  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = false; modChanged = true; updateModifierUI("rootShiftDown", false); }
+  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = false; modChanged = true; updateModifierUI("rootShiftUp", false); }
+  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = false; modChanged = true; updateModifierUI("majorSeventh", false); }
+  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = false; modChanged = true; updateModifierUI("halfDiminished", false); }
+  if (majorModifiers.includes(e.key)) { appState.modifiers.major = false; modChanged = true; updateModifierUI("major", false); }
 
   if (modChanged) {
     if (appState.modReleaseTimeout) {
@@ -639,4 +678,56 @@ document.querySelectorAll(".key").forEach(keyEl => {
 
   keyEl.addEventListener("mouseup", () => stopChord(num - 1));
   keyEl.addEventListener("mouseleave", () => stopChord(num - 1));
+});
+
+// Numpad Interactions
+document.querySelectorAll(".np-btn").forEach(btn => {
+  // If it's a note key
+  if (btn.hasAttribute("data-note")) {
+    const num = parseInt(btn.getAttribute("data-note"));
+
+    // Touch/Mouse support
+    const start = (e) => {
+      e.preventDefault(); // Prevent double firing if hybrid
+      if (!appState.isAudioStarted) {
+        alert("Please click 'Start Audio Engine' first");
+        return;
+      }
+      startChord(num - 1);
+    };
+    const stop = (e) => {
+      e.preventDefault();
+      stopChord(num - 1);
+    };
+
+    btn.addEventListener("mousedown", start);
+    btn.addEventListener("mouseup", stop);
+    btn.addEventListener("mouseleave", stop);
+
+    btn.addEventListener("touchstart", start);
+    btn.addEventListener("touchend", stop);
+
+  } else {
+    // It's a modifier key
+    const id = btn.id; // e.g., "np-dominant"
+    if (!id) return;
+
+    const modName = id.replace("np-", "");
+
+    const activate = (e) => {
+      e.preventDefault();
+      setModifier(modName, true);
+    };
+    const deactivate = (e) => {
+      e.preventDefault();
+      setModifier(modName, false);
+    };
+
+    btn.addEventListener("mousedown", activate);
+    btn.addEventListener("mouseup", deactivate);
+    btn.addEventListener("mouseleave", deactivate);
+
+    btn.addEventListener("touchstart", activate);
+    btn.addEventListener("touchend", deactivate);
+  }
 });
