@@ -18,10 +18,12 @@
     </script>
   </head>
   <body>
+    <div id="chord-tint"></div>
+    <div id="background-fx"></div>
     <div id="app">
       <header>
         <div class="title-row">
-          <h1>Chord Keypad</h1>
+          <h1>Howl-o-chord</h1>
           <button id="help-btn" aria-label="Help">?</button>
         </div>
         <p></p>
@@ -63,7 +65,7 @@
           >
         </button>
         <div id="chord-info-container" style="display: none">
-          <h2 id="current-chord">-</h2>
+          <h3 id="current-chord">-</h3>
           <div id="notes-display"></div>
         </div>
       </div>
@@ -284,6 +286,13 @@
             of modifier keys.
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- Theremin UI -->
+    <div id="theremin-container">
+      <div id="theremin-bar">
+        <div id="pitch-indicator"></div>
       </div>
     </div>
 

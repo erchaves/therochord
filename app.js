@@ -20,7 +20,8 @@ const appState = {
   activeVoicings: {},
   modReleaseTimeout: null,
   pendingChordStarts: {},
-  voiceLeadingEnabled: true
+  voiceLeadingEnabled: true,
+  thereminSynth: null
 };
 
 // modifier keys
@@ -38,12 +39,58 @@ const majorModifiers = ["Enter"];
 
 const KEY_ORDER = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
+// Theremin Constants
+const THEREMIN_MIN_FREQ = 130.81; // C3
+const THEREMIN_MAX_FREQ = 1046.50; // C6
+const THEREMIN_SEMITONES = 36; // 3 Octaves
+
+// Varied Tints for Keys 1-7 (Spectrum)
+const CHORD_TINTS = [
+  "#d62828", // 1: Red
+  "#f77f00", // 2: Orange
+  "#fcbf49", // 3: Yellow
+  "#206a5d", // 4: Green
+  "#003049", // 5: Navy/Blue
+  "#5e60ce", // 6: Indigo
+  "#bc4749"  // 7: Rose/Pink
+];
+const chordTint = document.getElementById("chord-tint");
+
+// Background Effect
+const bgEffect = document.getElementById("background-fx");
+let isBgFlipped = false;
+
+// Helper: Toggle Background Effect
+function toggleBgEffect(isActive) {
+  if (!bgEffect) return;
+
+  if (isActive) {
+    // RESTART ANIMATION HACK
+    // Toggle background-image to 'none' and back to force restart
+    bgEffect.style.backgroundImage = 'none';
+    void bgEffect.offsetWidth; // Force Reflow
+    bgEffect.style.backgroundImage = "url('images/howl.gif')";
+
+    bgEffect.classList.add("active");
+    // Flip on new attack
+    isBgFlipped = !isBgFlipped;
+    if (isBgFlipped) {
+      bgEffect.classList.add("flipped");
+    } else {
+      bgEffect.classList.remove("flipped");
+    }
+  } else {
+    bgEffect.classList.remove("active");
+  }
+}
+
 // Initialize Synth
 function initAudio() {
   if (appState.isAudioStarted) return;
 
   appState.synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: "triangle" },
+    volume: -10,
     envelope: {
       attack: 0.02,
       decay: 0.1,
@@ -55,6 +102,14 @@ function initAudio() {
   // Add some reverb for nicer sound
   const reverb = new Tone.Reverb(1.5).toDestination();
   appState.synth.connect(reverb);
+
+  // Initialize Theremin Synth (MonoSynth with visual portamento)
+  appState.thereminSynth = new Tone.MonoSynth({
+    volume: 1,
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.1, max: 0.5 },
+    portamento: 0.05 // Glide amount
+  }).connect(reverb);
 
   console.log("Audio Initialized");
   appState.isAudioStarted = true;
@@ -217,11 +272,28 @@ function getChordWithModifiers(degreeIndex, baseChord) {
   return baseChord;
 }
 
+// Helper: Update Tint
+function updateTint(degreeIndex) {
+  if (!chordTint) return;
+
+  if (degreeIndex !== null && degreeIndex >= 0 && degreeIndex < CHORD_TINTS.length) {
+    chordTint.style.backgroundColor = CHORD_TINTS[degreeIndex];
+    chordTint.classList.add("active");
+  } else {
+    // Check if chords are still playing?
+    // In stopChord we will check this.
+    chordTint.classList.remove("active");
+  }
+}
+
 // Start Chord (Attack)
 function startChord(degreeIndex) {
   if (!appState.isAudioStarted) return;
   // If already playing this key, ignore to prevent stutter/polyphony buildup
   if (appState.activeVoicings[degreeIndex]) return;
+
+  // Apply Sepia Tint
+  updateTint(degreeIndex);
 
   const chords = getScaleChords(appState.root, appState.scaleType);
   let chord = chords[degreeIndex]; // degreeIndex is 0-6
@@ -316,6 +388,11 @@ function stopChord(degreeIndex) {
   if (notes) {
     appState.synth.triggerRelease(notes);
     delete appState.activeVoicings[degreeIndex];
+
+    // Check if any chords left active
+    if (Object.keys(appState.activeVoicings).length === 0) {
+      updateTint(null); // Fade out
+    }
 
     const keyEl = document.querySelector(`.key[data-note="${degreeIndex + 1}"]`);
     if (keyEl) keyEl.classList.remove("active");
@@ -453,6 +530,7 @@ function changeGlobalKey(direction) {
 
   // Update any active chords to new key
   updateActiveChords();
+  initThereminScale(); // Update Theremin grid on hotkey change
 }
 
 // Helper for UI updates
@@ -502,6 +580,7 @@ helpModal.addEventListener("click", (e) => {
 
 document.getElementById("root-note").addEventListener("change", (e) => {
   appState.root = e.target.value;
+  initThereminScale(); // Update Theremin grid to new key
   e.target.blur(); // Remove focus to prevent keyboard capturing
 });
 
@@ -731,3 +810,157 @@ document.querySelectorAll(".np-btn").forEach(btn => {
     btn.addEventListener("touchend", deactivate);
   }
 });
+// -------------------------------------------------------------------
+// Theremin Logic
+// -------------------------------------------------------------------
+const thereminContainer = document.getElementById("theremin-container");
+const thereminBar = document.getElementById("theremin-bar"); // Need this for ticks
+const pitchIndicator = document.getElementById("pitch-indicator");
+
+let isThereminActive = false;
+
+// Generate Scale Grid
+function initThereminScale() {
+  if (!thereminBar) return;
+
+  // Clear existing ticks (preserve pitch-indicator)
+  const existingTicks = thereminBar.querySelectorAll(".theremin-tick");
+  existingTicks.forEach(tick => tick.remove());
+
+  const scaleName = `${appState.root} ${appState.scaleType}`;
+  const scale = Scale.get(scaleName);
+
+  // Tonal.js might return notes like "C#", "Db". Map to Chroma index (0-11) for comparison.
+  // Note.chroma("C") -> 0, Note.chroma("C#") -> 1, etc.
+  const scaleChromas = scale.notes.map(n => Note.chroma(n));
+  const rootChroma = Note.chroma(appState.root);
+
+  // We want to generate ticks for 36 semitones (C3 to C6)
+  // C3 is index 0. C6 is index 36.
+  for (let i = 0; i <= THEREMIN_SEMITONES; i++) {
+    const tick = document.createElement("div");
+    tick.classList.add("theremin-tick");
+
+    // Calculate position percentage from bottom (0% pitch to 100% pitch)
+    // i=0 -> 0% (bottom), i=36 -> 100% (top)
+    const percent = (i / THEREMIN_SEMITONES) * 100;
+    tick.style.bottom = `${percent}%`; // Use bottom positioning
+    tick.style.top = 'auto'; // Override default absolute top if any
+    tick.style.transform = 'translateY(50%)'; // Center on line
+
+    // Note Type Logic
+    // C3 corresponds to chroma 0 (C).
+    // i=0 is C3 (Chroma 0).
+    const currentChroma = i % 12;
+
+    if (currentChroma === rootChroma) {
+      tick.classList.add("root");
+    } else if (scaleChromas.includes(currentChroma)) {
+      tick.classList.add("natural");
+    } else {
+      tick.classList.add("accidental");
+    }
+
+    thereminBar.appendChild(tick);
+  }
+}
+
+// Call on load
+initThereminScale();
+
+function getPitchFromY(y) {
+  // Use the visual bar as the reference for range
+  if (!thereminBar) return THEREMIN_MIN_FREQ;
+
+  const rect = thereminBar.getBoundingClientRect();
+
+  // Clamp Y to the bar area (so going outside maintains min/max)
+  const clampedY = Math.max(rect.top, Math.min(y, rect.bottom));
+
+  // Map Top (rect.top) -> High Pitch (1.0), Bottom (rect.bottom) -> Low Pitch (0.0)
+  const normalized = 1 - ((clampedY - rect.top) / rect.height);
+
+  // Using Logarithmic scale for pitch perception
+  // f = f_min * (f_max / f_min)^normalized
+  const freq = THEREMIN_MIN_FREQ * Math.pow(THEREMIN_MAX_FREQ / THEREMIN_MIN_FREQ, normalized);
+  return freq;
+}
+
+window.addEventListener("mousedown", (e) => {
+  // Left Click only
+  if (e.button !== 0) return;
+
+  // Only if audio is started
+  if (!appState.isAudioStarted) return;
+
+  // Check if clicking interactive elements to avoid conflict? 
+  // The user requested "Pressing the left mouse button turns on playback".
+  // We should probably allow it globally unless clicking a button?
+  if (e.target.tagName === 'BUTTON' || e.target.closest('.key') || e.target.closest('.np-btn')) return;
+
+  isThereminActive = true;
+  const freq = getPitchFromY(e.clientY);
+
+  if (appState.thereminSynth) {
+    appState.thereminSynth.triggerAttack(freq);
+  }
+
+  // Update Visuals
+  pitchIndicator.classList.add("active");
+  toggleBgEffect(true); // Show BG + Flip
+  updateThereminVisuals(e.clientY);
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (isThereminActive && appState.thereminSynth) {
+    const freq = getPitchFromY(e.clientY);
+    appState.thereminSynth.setNote(freq); // MonoSynth uses setNote for glide
+    updateThereminVisuals(e.clientY);
+  } else {
+    // Just update visuals passively if we want? Or hidden?
+    // User said "Show a vertical bar... indicating what pitch we're on"
+    // Let's update it passively too so they know where they will start.
+    updateThereminVisuals(e.clientY);
+  }
+});
+
+window.addEventListener("mouseup", () => {
+  if (isThereminActive) {
+    isThereminActive = false;
+    if (appState.thereminSynth) {
+      appState.thereminSynth.triggerRelease();
+    }
+    pitchIndicator.classList.remove("active");
+    toggleBgEffect(false); // Hide BG
+  }
+});
+
+function updateThereminVisuals(y) {
+  // Clamp Y to window
+  const clampedY = Math.max(0, Math.min(y, window.innerHeight));
+  pitchIndicator.style.top = `${clampedY}px`;
+  // We used bottom: 50% / top... actually in CSS we put absolute positioning.
+  // Let's just set top directly.
+  // CSS was: #pitch-indicator { position: absolute; ... }
+  // But #theremin-bar is the container. #theremin-container is fixed.
+  // #theremin-bar depends on height.
+
+  // Wait, the pitch indicator is inside the bar.
+  // Ideally we track GLOBAL Y, but the indicator is inside a container.
+  // Since container is centered 80vh, we need relative Y.
+
+  // Easier approach: Move the indicator in the Fixed container?
+  // Actually, simply setting `top` on floating fixed element is tricky if nested.
+
+  // Let's simplify: Set the indicator's position relative to the viewport using fixed?
+  // No, it's inside #theremin-bar (relative).
+
+  // Let's map global Y to percentage of the bar.
+  const containerRect = document.getElementById("theremin-bar").getBoundingClientRect();
+  const relativeY = y - containerRect.top;
+  const percent = Math.max(0, Math.min(100, (relativeY / containerRect.height) * 100));
+
+  pitchIndicator.style.top = `${percent}%`;
+  pitchIndicator.style.bottom = 'auto';
+  pitchIndicator.style.transform = 'translate(-50%, -50%)'; // Center on cursor vertically
+}
