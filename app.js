@@ -13,16 +13,18 @@ const appState = {
     majorSixth: false, // 's' key
     augmented: false,   // '+' key
     majorSeventh: false, // '9' or 'm' key
-    halfDiminished: false, // 'x' or 'Backspace'
+    halfDiminished: false, // 'c' or 'Backspace'
     major: false, // 'Enter'
-    minorSeventh: false // 'c' key
+    minorSeventh: false, // 's' key
+    minorSix: false // 'x' key
   },
   lastVoicing: null,
   activeVoicings: {},
+  thereminSynth: null,
+  physicalModifiers: new Set(), // Keys physically held down
   modReleaseTimeout: null,
   pendingChordStarts: {},
-  voiceLeadingEnabled: true,
-  thereminSynth: null
+  voiceLeadingEnabled: true
 };
 
 // modifier keys
@@ -30,16 +32,17 @@ const majorModifiers = ["q", "Q", "Enter"];
 const minorModifiers = ["w", "W", "-"];
 const dominantModifiers = ["e", "E", "/"];
 
-const majorSixthModifiers = ["a", "A", "8"];
-const majorSeventhModifiers = ["s", "S", "9"];
+const minorSeventhModifiers = ["s", "S", "Backspace"];
+const majorSeventhModifiers = ["a", "A", "9"];
 const diminishedModifiers = ["d", "D", "*"];
 
-const augmentedModifiers = ["z", "Z", "+"];
-const halfDiminishedModifiers = ["x", "X", "Escape", "NumLock", "Tab"];
-const minorSeventhModifiers = ["c", "C", "Backspace"];
+const augmentedModifiers = ["v", "V", "+"];
+const halfDiminishedModifiers = ["c", "C", "Escape", "NumLock", "Tab"];
 
-const rootShiftDownModifiers = ["Alt", "0"];
-const rootShiftUpModifiers = [" ", "."];
+const rootShiftDownModifiers = ["f", "F", "0"];
+const rootShiftUpModifiers = ["r", "R", "."];
+const majorSixthModifiers = ["z", "Z", "8"];
+const minorSixModifiers = ["x", "X"];
 
 const KEY_ORDER = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
@@ -140,6 +143,7 @@ function getQualityName(qualitySymbol, baseName) {
     case "maj7": return "Maj 7";
     case "m7b5": return "m7b5";
     case "m7": return "Min 7";
+    case "m6": return "Minor 6th";
     case "M": return "Major";
     default: return baseName; // Fallback
   }
@@ -236,6 +240,8 @@ function getChordWithModifiers(degreeIndex, baseChord) {
   else if (appState.modifiers.halfDiminished) quality = "m7b5";
   // Minor 7th -> m7
   else if (appState.modifiers.minorSeventh) quality = "m7";
+  // Minor 6th -> m6
+  else if (appState.modifiers.minorSix) quality = "m6";
   // Major Triad -> M
   else if (appState.modifiers.major) quality = "M";
 
@@ -301,8 +307,6 @@ function updateTint(degreeIndex) {
 // Start Chord (Attack)
 function startChord(degreeIndex) {
   if (!appState.isAudioStarted) return;
-  // If already playing this key, ignore to prevent stutter/polyphony buildup
-  if (appState.activeVoicings[degreeIndex]) return;
 
   // Apply Sepia Tint
   updateTint(degreeIndex);
@@ -314,75 +318,63 @@ function startChord(degreeIndex) {
   // Apply Modifiers
   chord = getChordWithModifiers(degreeIndex, chord);
 
-  // Voice Leading Logic
+  // Calculate new notes for the chord
   const targetNotes = chord.notes;
-  let nextVoicing;
+  let nextVoicingNotes;
 
   if (appState.voiceLeadingEnabled) {
-    // SMART MODE: Minimize movement
     if (!appState.lastVoicing) {
       appState.lastVoicing = targetNotes.map(n => n + "4");
     }
-
-    // Generate options in octaves 3 and 4 to stay lower
     let options = generateVoicingOptions(targetNotes, ["3", "4"]);
-
-    // Constraint: Do not exceed C5
     const limitMidi = note("C5").midi;
-    const validOptions = options.filter(opt => {
-      return opt.every(n => note(n).midi <= limitMidi);
-    });
-
-    // Fallback
+    const validOptions = options.filter(opt => opt.every(n => note(n).midi <= limitMidi));
     const candidates = validOptions.length > 0 ? validOptions : options;
-    nextVoicing = getBestVoicing(appState.lastVoicing, candidates);
-
-    // Update state for next time
-    appState.lastVoicing = nextVoicing;
-
+    nextVoicingNotes = getBestVoicing(appState.lastVoicing, candidates);
+    appState.lastVoicing = nextVoicingNotes;
   } else {
-    // DUMB MODE: Strictly Ascending Root Position (starting at Octave 4)
-    // This ensures we have a proper stack (e.g. B4-D5-F5) instead of inversions (D4-F4-B4)
-    // and allows extending beyond C5 as requested.
-
-    nextVoicing = [];
+    nextVoicingNotes = [];
     let currentOctave = 4;
     let prevMidi = -1;
-
     targetNotes.forEach((n, idx) => {
       let candidateName = n + currentOctave;
       let candidateMidi = note(candidateName).midi;
-
-      // If this note is lower/equal to previous, bump octave
       if (idx > 0 && candidateMidi <= prevMidi) {
         currentOctave++;
         candidateName = n + currentOctave;
         candidateMidi = note(candidateName).midi;
       }
-
-      nextVoicing.push(candidateName);
+      nextVoicingNotes.push(candidateName);
       prevMidi = candidateMidi;
     });
-
-    // Reset lastVoicing so if we toggle back ON, it starts fresh or uses this as base
-    appState.lastVoicing = nextVoicing;
+    appState.lastVoicing = nextVoicingNotes;
   }
 
-  // Add Root Bass Note an octave down
-  const notesObjs = nextVoicing.map(n => note(n));
+  // Add Bass Note
+  const notesObjs = nextVoicingNotes.map(n => note(n));
   notesObjs.sort((a, b) => a.midi - b.midi);
   const lowestOctave = notesObjs[0].oct;
   const bassNote = chord.root + (lowestOctave - 1);
-
-  const fullVoicing = [...nextVoicing, bassNote];
-  // Simplify notes to handle double-sharps (e.g. F## -> G) for Tone.js compatibility and readability
+  const fullVoicing = [...nextVoicingNotes, bassNote];
   const simpleVoicing = fullVoicing.map(n => Note.simplify(n));
 
-  // Store acting voicing so we can release it later
-  appState.activeVoicings[degreeIndex] = simpleVoicing;
+  // NOTE DIFFING: Only change what's necessary
+  const currentVoicing = appState.activeVoicings[degreeIndex] || [];
 
-  // Trigger Attack (Sustain)
-  appState.synth.triggerAttack(simpleVoicing);
+  // Find notes to release (in current but not in new)
+  const toRelease = currentVoicing.filter(n => !simpleVoicing.includes(n));
+  // Find notes to attack (in new but not in current)
+  const toAttack = simpleVoicing.filter(n => !currentVoicing.includes(n));
+
+  if (toRelease.length > 0) {
+    appState.synth.triggerRelease(toRelease);
+  }
+  if (toAttack.length > 0) {
+    appState.synth.triggerAttack(toAttack);
+  }
+
+  // Store acting voicing
+  appState.activeVoicings[degreeIndex] = simpleVoicing;
 
   // UI Update
   updateDisplay(chord, simpleVoicing);
@@ -515,14 +507,13 @@ function updateDisplay(chord, voicing) {
   document.getElementById("notes-display").innerText = voicing.join(" - ");
 }
 
-// Update Active Chords (Hot-Swap)
+// Update Active Chords (Hot-Swap / Transitions)
 function updateActiveChords() {
   if (!appState.isAudioStarted) return;
-  // Iterate over all active keys and re-trigger them
+  // Iterate over all active keys and refresh them
   Object.keys(appState.activeVoicings).forEach(key => {
     const degree = parseInt(key);
-    stopChord(degree);
-    startChord(degree);
+    startChord(degree); // startChord now handles note diffing internally
   });
 }
 
@@ -554,12 +545,64 @@ function updateModifierUI(modName, isActive) {
   if (npBtn) isActive ? npBtn.classList.add("active") : npBtn.classList.remove("active");
 }
 
-// Set Modifier State (for Mouse/Touch)
+// Set Modifier State (for Mouse/Keyboard)
 function setModifier(modName, isActive) {
-  appState.modifiers[modName] = isActive;
-  updateModifierUI(modName, isActive);
+  const transModNames = ["rootShiftUp", "rootShiftDown"];
+  const isTransMod = transModNames.includes(modName);
 
-  // Immediate update for mouse interaction
+  if (isActive) {
+    appState.modifiers[modName] = true;
+    appState.physicalModifiers.add(modName);
+    updateModifierUI(modName, true);
+
+    // GROUP EXCLUSIVITY:
+    Object.keys(appState.modifiers).forEach(m => {
+      if (m === modName) return;
+
+      const isM7Combo = (modName === "minor" && m === "dominant") || (modName === "dominant" && m === "minor");
+      const mIsTrans = transModNames.includes(m);
+
+      if (isTransMod) {
+        // If we pressed a Trans Mod, only clear other Trans Mods
+        if (mIsTrans) {
+          appState.modifiers[m] = false;
+          updateModifierUI(m, false);
+        }
+      } else {
+        // If we pressed a Quality Mod, clear other Quality Mods (except m7 combo)
+        if (!mIsTrans && !isM7Combo) {
+          appState.modifiers[m] = false;
+          updateModifierUI(m, false);
+        }
+      }
+    });
+
+    if (appState.modReleaseTimeout) {
+      clearTimeout(appState.modReleaseTimeout);
+      appState.modReleaseTimeout = null;
+    }
+  } else {
+    appState.physicalModifiers.delete(modName);
+
+    if (appState.modReleaseTimeout) clearTimeout(appState.modReleaseTimeout);
+
+    appState.modReleaseTimeout = setTimeout(() => {
+      if (!appState.physicalModifiers.has(modName)) {
+        appState.modifiers[modName] = false;
+        updateModifierUI(modName, false);
+      }
+
+      if (appState.physicalModifiers.size === 0) {
+        Object.keys(appState.modifiers).forEach(m => {
+          appState.modifiers[m] = false;
+          updateModifierUI(m, false);
+        });
+      }
+      updateActiveChords();
+      appState.modReleaseTimeout = null;
+    }, 150);
+  }
+
   updateActiveChords();
 }
 
@@ -596,25 +639,30 @@ document.getElementById("root-note").addEventListener("change", (e) => {
   e.target.blur(); // Remove focus to prevent keyboard capturing
 });
 
-document.getElementById("voice-leading-toggle").addEventListener("change", (e) => {
-  appState.voiceLeadingEnabled = e.target.checked;
-  e.target.blur(); // Remove focus
+document.getElementById("voice-leading-btn").addEventListener("click", (e) => {
+  appState.voiceLeadingEnabled = !appState.voiceLeadingEnabled;
+  e.target.classList.toggle("active", appState.voiceLeadingEnabled);
+  e.target.innerText = `Voice Leading: ${appState.voiceLeadingEnabled ? "ON" : "OFF"}`;
+  e.target.blur();
 });
 
-document.getElementById("numpad-mode-toggle").addEventListener("change", (e) => {
-  const isNumpad = e.target.checked;
-  e.target.blur();
-
+document.getElementById("layout-toggle-btn").addEventListener("click", (e) => {
   const defaultInterface = document.getElementById("default-interface");
   const numpadInterface = document.getElementById("numpad-interface");
+  const isCurrentlyNumpad = numpadInterface.style.display === 'block';
 
-  if (isNumpad) {
-    defaultInterface.style.display = 'none';
-    numpadInterface.style.display = 'block';
-  } else {
+  if (isCurrentlyNumpad) {
     defaultInterface.style.display = 'block';
     numpadInterface.style.display = 'none';
+    e.target.innerText = "Layout: QWERTY";
+    e.target.classList.remove("active");
+  } else {
+    defaultInterface.style.display = 'none';
+    numpadInterface.style.display = 'block';
+    e.target.innerText = "Layout: NUMPAD";
+    e.target.classList.add("active");
   }
+  e.target.blur();
 });
 
 
@@ -634,6 +682,7 @@ window.addEventListener("keydown", (e) => {
     majorSeventhModifiers.includes(e.key) ||
     halfDiminishedModifiers.includes(e.key) ||
     minorSeventhModifiers.includes(e.key) ||
+    minorSixModifiers.includes(e.key) ||
     majorModifiers.includes(e.key);
 
   const num = parseInt(e.key);
@@ -682,69 +731,48 @@ window.addEventListener("keydown", (e) => {
   }
 
   // Modifiers tracking
-  // Modifiers tracking
-  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = true; modChanged = true; updateModifierUI("dominant", true); }
-  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = true; modChanged = true; updateModifierUI("minor", true); }
-  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = true; modChanged = true; updateModifierUI("diminished", true); }
-  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = true; modChanged = true; updateModifierUI("majorSixth", true); }
-  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = true; modChanged = true; updateModifierUI("augmented", true); }
-  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = true; modChanged = true; updateModifierUI("rootShiftDown", true); }
-  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = true; modChanged = true; updateModifierUI("rootShiftUp", true); }
-  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = true; modChanged = true; updateModifierUI("majorSeventh", true); }
-  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = true; modChanged = true; updateModifierUI("halfDiminished", true); }
-  if (minorSeventhModifiers.includes(e.key)) { appState.modifiers.minorSeventh = true; modChanged = true; updateModifierUI("minorSeventh", true); }
-  if (majorModifiers.includes(e.key)) { appState.modifiers.major = true; modChanged = true; updateModifierUI("major", true); }
-
-  // Hot-Swap: if modifiers changed, update held chords
-  if (modChanged) {
-    if (appState.modReleaseTimeout) {
-      clearTimeout(appState.modReleaseTimeout);
-      appState.modReleaseTimeout = null;
-    }
-    updateActiveChords();
-  }
+  if (dominantModifiers.includes(e.key)) { setModifier("dominant", true); modChanged = true; }
+  if (minorModifiers.includes(e.key)) { setModifier("minor", true); modChanged = true; }
+  if (diminishedModifiers.includes(e.key)) { setModifier("diminished", true); modChanged = true; }
+  if (majorSixthModifiers.includes(e.key)) { setModifier("majorSixth", true); modChanged = true; }
+  if (augmentedModifiers.includes(e.key)) { setModifier("augmented", true); modChanged = true; }
+  if (rootShiftDownModifiers.includes(e.key)) { setModifier("rootShiftDown", true); modChanged = true; }
+  if (rootShiftUpModifiers.includes(e.key)) { setModifier("rootShiftUp", true); modChanged = true; }
+  if (majorSeventhModifiers.includes(e.key)) { setModifier("majorSeventh", true); modChanged = true; }
+  if (halfDiminishedModifiers.includes(e.key)) { setModifier("halfDiminished", true); modChanged = true; }
+  if (minorSeventhModifiers.includes(e.key)) { setModifier("minorSeventh", true); modChanged = true; }
+  if (minorSixModifiers.includes(e.key)) { setModifier("minorSix", true); modChanged = true; }
+  if (majorModifiers.includes(e.key)) { setModifier("major", true); modChanged = true; }
 
 
 
   if (!isNaN(num) && num >= 1 && num <= 7) {
-    if (!appState.isAudioStarted) {
-      alert("Please click 'Start Audio Engine' first");
-      return;
-    }
-    // Debounce/Latency for Modifier Sync (20ms)
-    // If user presses Key then Modifier within 20ms, we want the modified chord.
-    appState.pendingChordStarts[num] = setTimeout(() => {
-      startChord(num - 1);
-      delete appState.pendingChordStarts[num];
-    }, 25);
+    promptForAudioEngine(() => {
+      // Debounce/Latency for Modifier Sync (20ms)
+      // If user presses Key then Modifier within 20ms, we want the modified chord.
+      appState.pendingChordStarts[num] = setTimeout(() => {
+        startChord(num - 1);
+        delete appState.pendingChordStarts[num];
+      }, 25);
+    });
   }
 });
 
 window.addEventListener("keyup", (e) => {
   let modChanged = false;
   // Modifiers tracking
-  if (dominantModifiers.includes(e.key)) { appState.modifiers.dominant = false; modChanged = true; updateModifierUI("dominant", false); }
-  if (minorModifiers.includes(e.key)) { appState.modifiers.minor = false; modChanged = true; updateModifierUI("minor", false); }
-  if (diminishedModifiers.includes(e.key)) { appState.modifiers.diminished = false; modChanged = true; updateModifierUI("diminished", false); }
-  if (majorSixthModifiers.includes(e.key)) { appState.modifiers.majorSixth = false; modChanged = true; updateModifierUI("majorSixth", false); }
-  if (augmentedModifiers.includes(e.key)) { appState.modifiers.augmented = false; modChanged = true; updateModifierUI("augmented", false); }
-  if (rootShiftDownModifiers.includes(e.key)) { appState.modifiers.rootShiftDown = false; modChanged = true; updateModifierUI("rootShiftDown", false); }
-  if (rootShiftUpModifiers.includes(e.key)) { appState.modifiers.rootShiftUp = false; modChanged = true; updateModifierUI("rootShiftUp", false); }
-  if (majorSeventhModifiers.includes(e.key)) { appState.modifiers.majorSeventh = false; modChanged = true; updateModifierUI("majorSeventh", false); }
-  if (halfDiminishedModifiers.includes(e.key)) { appState.modifiers.halfDiminished = false; modChanged = true; updateModifierUI("halfDiminished", false); }
-  if (minorSeventhModifiers.includes(e.key)) { appState.modifiers.minorSeventh = false; modChanged = true; updateModifierUI("minorSeventh", false); }
-  if (majorModifiers.includes(e.key)) { appState.modifiers.major = false; modChanged = true; updateModifierUI("major", false); }
-
-  if (modChanged) {
-    if (appState.modReleaseTimeout) {
-      clearTimeout(appState.modReleaseTimeout);
-    }
-    // Debounce the release to prevent accidental flashes of natural chord
-    appState.modReleaseTimeout = setTimeout(() => {
-      updateActiveChords();
-      appState.modReleaseTimeout = null;
-    }, 50);
-  }
+  if (dominantModifiers.includes(e.key)) { setModifier("dominant", false); }
+  if (minorModifiers.includes(e.key)) { setModifier("minor", false); }
+  if (diminishedModifiers.includes(e.key)) { setModifier("diminished", false); }
+  if (majorSixthModifiers.includes(e.key)) { setModifier("majorSixth", false); }
+  if (augmentedModifiers.includes(e.key)) { setModifier("augmented", false); }
+  if (rootShiftDownModifiers.includes(e.key)) { setModifier("rootShiftDown", false); }
+  if (rootShiftUpModifiers.includes(e.key)) { setModifier("rootShiftUp", false); }
+  if (majorSeventhModifiers.includes(e.key)) { setModifier("majorSeventh", false); }
+  if (halfDiminishedModifiers.includes(e.key)) { setModifier("halfDiminished", false); }
+  if (minorSeventhModifiers.includes(e.key)) { setModifier("minorSeventh", false); }
+  if (minorSixModifiers.includes(e.key)) { setModifier("minorSix", false); }
+  if (majorModifiers.includes(e.key)) { setModifier("major", false); }
 
   const num = parseInt(e.key);
   if (!isNaN(num) && num >= 1 && num <= 7) {
@@ -757,19 +785,27 @@ window.addEventListener("keyup", (e) => {
   }
 });
 
+function promptForAudioEngine(onInitiated) {
+  if (!appState.isAudioStarted) {
+    alert("Click OK to confirm 'Start Audio Engine'");
+    initAudio();
+    return;
+  }
+  if (onInitiated) {
+    onInitiated();
+  }
+}
+
 
 // Click Input (Refactored for sustain)
 document.querySelectorAll(".key").forEach(keyEl => {
   const num = parseInt(keyEl.getAttribute("data-note"));
 
   keyEl.addEventListener("mousedown", () => {
-    if (!appState.isAudioStarted) {
-      alert("Please click 'Start Audio Engine' first");
-      return;
-    }
-    startChord(num - 1);
+    promptForAudioEngine(() => {
+      startChord(num - 1);
+    });
   });
-
   keyEl.addEventListener("mouseup", () => stopChord(num - 1));
   keyEl.addEventListener("mouseleave", () => stopChord(num - 1));
 });
@@ -783,11 +819,9 @@ document.querySelectorAll(".np-btn").forEach(btn => {
     // Touch/Mouse support
     const start = (e) => {
       e.preventDefault(); // Prevent double firing if hybrid
-      if (!appState.isAudioStarted) {
-        alert("Please click 'Start Audio Engine' first");
-        return;
-      }
-      startChord(num - 1);
+      promptForAudioEngine(() => {
+        startChord(num - 1);
+      });
     };
     const stop = (e) => {
       e.preventDefault();

@@ -23,7 +23,7 @@
     <div id="app">
       <header>
         <div class="title-row">
-          <h1>Therichord</h1>
+          <h1>therichord</h1>
           <button id="help-btn" aria-label="Help">?</button>
         </div>
         <p></p>
@@ -31,7 +31,6 @@
 
       <div class="controls">
         <div class="key-selector">
-          <label for="root-note">Key:</label>
           <select id="root-note">
             <option value="C">C</option>
             <option value="Db">Db</option>
@@ -47,14 +46,12 @@
             <option value="B">B</option>
           </select>
         </div>
-        <div class="toggle-control">
-          <input type="checkbox" id="voice-leading-toggle" checked />
-          <label for="voice-leading-toggle">Enable Voice Leading</label>
-        </div>
-        <div class="toggle-control">
-          <input type="checkbox" id="numpad-mode-toggle" />
-          <label for="numpad-mode-toggle">Visual Numpad Layout</label>
-        </div>
+        <button class="control-btn active" id="voice-leading-btn">
+          Voice Leading: ON
+        </button>
+        <button class="control-btn" id="layout-toggle-btn">
+          Layout: QWERTY
+        </button>
       </div>
 
       <div class="display">
@@ -74,82 +71,142 @@
       <div id="default-interface">
         <div class="keypad">
           <div class="key" data-note="1">
-            1
-            <div>I</div>
+            <span class="key-label">1</span>
+            <span class="mod-name">I</span>
           </div>
           <div class="key" data-note="2">
-            2
-            <div>ii</div>
+            <span class="key-label">2</span>
+            <span class="mod-name">ii</span>
           </div>
           <div class="key" data-note="3">
-            3
-            <div>iii</div>
+            <span class="key-label">3</span>
+            <span class="mod-name">iii</span>
           </div>
           <div class="key" data-note="4">
-            4
-            <div>IV</div>
+            <span class="key-label">4</span>
+            <span class="mod-name">IV</span>
           </div>
           <div class="key" data-note="5">
-            5
-            <div>V</div>
+            <span class="key-label">5</span>
+            <span class="mod-name">V</span>
           </div>
           <div class="key" data-note="6">
-            6
-            <div>vi</div>
+            <span class="key-label">6</span>
+            <span class="mod-name">vi</span>
           </div>
           <div class="key" data-note="7">
-            7
-            <div>vii°</div>
+            <span class="key-label">7</span>
+            <span class="mod-name">vii°</span>
           </div>
         </div>
 
         <div class="instructions">
           <h3>Chord modifiers (Hold + Chord)</h3>
-          <div class="modifier-grid">
-            <div class="mod-item" id="mod-major">
-              <span class="key-badge">q</span> <span>Major Triad</span>
+          <div class="qwerty-container">
+            <!-- Row 1 -->
+            <div class="qwerty-row">
+              <div
+                class="mod-key btn-qual"
+                id="mod-major"
+                title="Major Triad (Q)"
+              >
+                <span class="key-label">Q</span>
+                <span class="mod-name">Major</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-minor"
+                title="Minor Triad (W)"
+              >
+                <span class="key-label">W</span>
+                <span class="mod-name">Minor</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-dominant"
+                title="Dominant 7th (E)"
+              >
+                <span class="key-label">E</span>
+                <span class="mod-name">7</span>
+              </div>
+              <div
+                class="mod-key btn-root"
+                id="mod-rootShiftUp"
+                title="Sharp Root (R)"
+              >
+                <span class="key-label">R</span>
+                <span>♯</span>
+              </div>
             </div>
-            <div class="mod-item" id="mod-minor">
-              <span class="key-badge">w</span> <span>Minor Triad</span>
+            <!-- Row 2 -->
+            <div class="qwerty-row stagger-1">
+              <div
+                class="mod-key btn-qual"
+                id="mod-majorSeventh"
+                title="Major 7th (A)"
+              >
+                <span class="key-label">A</span>
+                <span class="mod-name">Maj 7</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-minorSeventh"
+                title="Minor 7th (S)"
+              >
+                <span class="key-label">S</span>
+                <span class="mod-name">Min 7</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-diminished"
+                title="Diminished 7th (D)"
+              >
+                <span class="key-label">D</span>
+                <span class="mod-name">Dim 7</span>
+              </div>
+              <div
+                class="mod-key btn-root"
+                id="mod-rootShiftDown"
+                title="Flat Root (F)"
+              >
+                <span class="key-label">F</span>
+                <span>♭</span>
+              </div>
             </div>
-            <div class="mod-item" id="mod-dominant">
-              <span class="key-badge">e</span>
-              <span>Dominant 7th</span>
-            </div>
-            <div class="mod-item" id="mod-majorSixth">
-              <span class="key-badge">a</span>
-              <span>Major 6th</span>
-            </div>
-            <div class="mod-item" id="mod-majorSeventh">
-              <span class="key-badge">s</span>
-              <span>Major 7th</span>
-            </div>
-            <div class="mod-item" id="mod-diminished">
-              <span class="key-badge">d</span>
-              <span>Diminished 7th</span>
-            </div>
-            <div class="mod-item" id="mod-augmented">
-              <span class="key-badge">z</span>
-              <span>Augmented 7th</span>
-            </div>
-            <div class="mod-item" id="mod-halfDiminished">
-              <span class="key-badge">x</span>
-              <span>Half-Diminished</span>
-            </div>
-            <div class="mod-item" id="mod-minorSeventh">
-              <span class="key-badge">c</span>
-              <span>Minor 7th</span>
-            </div>
-          </div>
-          <h3>Root note modifiers (Hold + Chord)</h3>
-          <div class="modifier-grid">
-            <div class="mod-item" id="mod-rootShiftDown">
-              <span class="key-badge">v</span>
-              <span>Flat Root (b)</span>
-            </div>
-            <div class="mod-item" id="mod-rootShiftUp">
-              <span class="key-badge">b</span>
-              <span>Sharp Root (#)</span>
+            <!-- Row 3 -->
+            <div class="qwerty-row stagger-2">
+              <div
+                class="mod-key btn-qual"
+                id="mod-majorSixth"
+                title="Major 6th (Z)"
+              >
+                <span class="key-label">Z</span>
+                <span class="mod-name">Maj 6</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-minorSix"
+                title="Minor 6th (X)"
+              >
+                <span class="key-label">X</span>
+                <span class="mod-name">Min 6</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-halfDiminished"
+                title="Half-Diminished (C)"
+              >
+                <span class="key-label">C</span>
+                <span class="mod-name">ø</span>
+              </div>
+              <div
+                class="mod-key btn-qual"
+                id="mod-augmented"
+                title="Augmented 7th (V)"
+              >
+                <span class="key-label">V</span>
+                <span class="mod-name">Aug 7</span>
+              </div>
             </div>
           </div>
         </div>
@@ -279,46 +336,50 @@
     <div id="help-modal" class="modal-overlay" style="display: none">
       <div class="modal-content">
         <button id="close-modal" aria-label="Close">&times;</button>
-        <h2>How to Use Chord Keypad</h2>
+        <h2>How to play the Therichord</h2>
         <p>
-          <strong>Chord Keypad</strong> turns your keyboard number keys (1-7)
-          into a chordal musical instrument. It is designed to be used with a
-          numerical keypad layout, but it can also be used with a standard
-          keyboard.
+          <strong>Thericord</strong> turns your keyboard number keys (1-7) and
+          mouse into a unique chordal / theremin-style lead instrument. It is
+          designed to be used with a numerical keypad layout, but it can also be
+          used with a standard keyboard.
         </p>
 
         <ul>
           <li>
             <strong>Play Chords:</strong> Press <code>1-7</code> to play
-            diatonic triads in the selected key.
-          </li>
-          <li>
-            <strong>Sustain:</strong> Hold a number key to sustain the chord.
+            diatonic triads in the selected key. Hold to sustain the chord.
           </li>
           <li>
             <strong>Modify:</strong> Hold a modifier key (like
-            <code>d</code> for Dominant 7th) while playing to change the chord
+            <code>e</code> for Dominant 7th) while playing to change the chord
             quality.
           </li>
           <li>
-            <strong>Hot-Swap:</strong> Change modifiers while holding a chord to
-            shift it instantly!
+            <strong>Transpose:</strong> Use the root ♯ and ♭ buttons to
+            transpose the current chord. This gets you the chords between the
+            diatonic chords.
           </li>
           <li>
             <strong>Voice Leading:</strong> Tries to move notes as little as
-            possible between chords for a smooth sound.
+            possible between chords for a smooth sound. Can be toggled on and
+            off.
           </li>
           <li>
             <strong>Change keys:</strong> Use the dropdown to change keys, or
             hold <code>Enter</code> and press <code>+</code> or <code>-</code>
-            to shift the key up or down chromatically.
+            to shift the key up or down a semitone.
+          </li>
+          <li>
+            <strong>Mouse theremin:</strong> Click and drag anywhere on the
+            screen to activate the theremin. The root (green) and diatonic
+            (white) notes are highlighted on the right vertical bar.
           </li>
         </ul>
 
         <div class="modal-footer">
           <p>
-            Check the instructions on the bottom of the page for the full list
-            of modifier keys.
+            If your numerical keypad has a delete/backspace key, this can also
+            be used as a minor 7 modifier
           </p>
         </div>
       </div>
