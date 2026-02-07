@@ -75,10 +75,13 @@ body {
 .modal-content {
   background: #1e1e1e;
   border: 1px solid #333;
-  padding: 2rem;
+  padding: 1.5rem;
+  margin: 1rem;
   border-radius: 12px;
   max-width: 500px;
   width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
   position: relative;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
@@ -334,6 +337,7 @@ header p {
   display: flex;
   gap: 1rem;
   justify-content: center;
+  padding: 0 8px;
   align-items: center;
 }
 
@@ -388,15 +392,44 @@ button:hover {
 }
 
 select {
-  padding: 0.5rem;
-  border-radius: 4px;
-  background: var(--key-bg);
-  color: var(--text-color);
-  border: 1px solid #444;
+  padding: 0.5rem 2.2rem 0.5rem 0.8rem; /* Extra right padding for arrow */
+  border-radius: 6px;
+  background: #252525;
+  color: #eee;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow:
+    0 -1px 0 #3a3a3a inset,
+    0 2px 0 #111,
+    0 3px 4px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s;
+  height: auto;
+  min-width: 65px; /* Ensure enough width for labels + arrow */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1rem;
+}
+
+select:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--key-active);
+  box-shadow: 0 0 10px var(--key-active);
 }
 
 .display {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   height: 60px;
 }
 
@@ -643,6 +676,17 @@ select {
     margin-right: 0;
     border-radius: 5px 0 0 5px;
     width: 6px;
+  }
+
+  .control-btn {
+    font-size: 0.65rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  select {
+    font-size: 0.65rem;
+    padding: 0.4rem 1.8rem 0.4rem 0.5rem; /* Preserve arrow space */
+    min-width: 55px;
   }
 }
 

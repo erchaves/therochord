@@ -224,6 +224,8 @@ function getChordWithModifiers(degreeIndex, baseChord) {
   // Logic:
   // Minor + Dominant -> m7
   if (appState.modifiers.minor && appState.modifiers.dominant) quality = "m7";
+  // Minor + Major 6th -> m6
+  else if (appState.modifiers.minor && appState.modifiers.majorSixth) quality = "m6";
   // Dominant -> 7 (Dominant 7th)
   else if (appState.modifiers.dominant) quality = "7";
   // Minor -> m (Minor Triad)
@@ -560,6 +562,7 @@ function setModifier(modName, isActive) {
       if (m === modName) return;
 
       const isM7Combo = (modName === "minor" && m === "dominant") || (modName === "dominant" && m === "minor");
+      const isM6Combo = (modName === "minor" && m === "majorSixth") || (modName === "majorSixth" && m === "minor");
       const mIsTrans = transModNames.includes(m);
 
       if (isTransMod) {
@@ -569,8 +572,8 @@ function setModifier(modName, isActive) {
           updateModifierUI(m, false);
         }
       } else {
-        // If we pressed a Quality Mod, clear other Quality Mods (except m7 combo)
-        if (!mIsTrans && !isM7Combo) {
+        // If we pressed a Quality Mod, clear other Quality Mods (except special combos)
+        if (!mIsTrans && !isM7Combo && !isM6Combo) {
           appState.modifiers[m] = false;
           updateModifierUI(m, false);
         }
@@ -797,17 +800,46 @@ function promptForAudioEngine(onInitiated) {
 }
 
 
-// Click Input (Refactored for sustain)
+// Click/Touch Input for QWERTY Chord Keys
 document.querySelectorAll(".key").forEach(keyEl => {
   const num = parseInt(keyEl.getAttribute("data-note"));
 
-  keyEl.addEventListener("mousedown", () => {
+  const start = (e) => {
+    e.preventDefault();
     promptForAudioEngine(() => {
       startChord(num - 1);
     });
-  });
-  keyEl.addEventListener("mouseup", () => stopChord(num - 1));
-  keyEl.addEventListener("mouseleave", () => stopChord(num - 1));
+  };
+  const stop = (e) => {
+    e.preventDefault();
+    stopChord(num - 1);
+  };
+
+  keyEl.addEventListener("mousedown", start);
+  keyEl.addEventListener("mouseup", stop);
+  keyEl.addEventListener("mouseleave", stop);
+  keyEl.addEventListener("touchstart", start);
+  keyEl.addEventListener("touchend", stop);
+});
+
+// Click/Touch Input for QWERTY Modifier Keys
+document.querySelectorAll(".mod-key").forEach(modEl => {
+  const modName = modEl.id.replace("mod-", "");
+
+  const activate = (e) => {
+    e.preventDefault();
+    setModifier(modName, true);
+  };
+  const deactivate = (e) => {
+    e.preventDefault();
+    setModifier(modName, false);
+  };
+
+  modEl.addEventListener("mousedown", activate);
+  modEl.addEventListener("mouseup", deactivate);
+  modEl.addEventListener("mouseleave", deactivate);
+  modEl.addEventListener("touchstart", activate);
+  modEl.addEventListener("touchend", deactivate);
 });
 
 // Numpad Interactions
