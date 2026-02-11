@@ -715,9 +715,8 @@ select:focus {
     min-width: 55px;
   }
 
-  /* Anchored Round Amber Button on Mobile */
+  /* Anchored Round Amber Button on Mobile/Tablet */
   #mobile-theremin-btn {
-    display: block !important;
     position: absolute; /* Relative to .display or .chord-row */
     left: 18px; /* Moved further from edge */
     top: 50%;
@@ -775,7 +774,11 @@ select:focus {
   }
 }
 
-/* Hide by default for desktop */
+/* Show only on devices with motion sensors */
+body.has-accel #mobile-theremin-btn {
+  display: block;
+}
+
 #mobile-theremin-btn {
   display: none;
 }

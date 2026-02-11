@@ -1189,6 +1189,14 @@ function updateThereminVisualsFromNormalized(normalized) {
 }
 // Initialize Layout Default
 window.addEventListener("load", () => {
+  // Detect motion sensor / touch support for Theremin button
+  const hasMotion = typeof DeviceOrientationEvent !== 'undefined' || typeof DeviceMotionEvent !== 'undefined';
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  if (hasMotion && hasTouch) {
+    document.body.classList.add("has-accel");
+  }
+
   if (window.innerWidth < 600) {
     updateLayoutUI(true);
     const subtext = document.getElementById("start-audio-subtext");
