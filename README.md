@@ -2,7 +2,9 @@
 
 <a href="https://ibb.co/N2FkZ25W"><img src="https://i.ibb.co/Kx5QFxdV/IMG-6219-2.jpg" alt="IMG-6219-2" border="0"></a>
 
-**therochord** is a unique web-based musical instrument that turns your computer keyboard and mouse into a expressive chordal accompaniment and theremin-style lead synthesizer. It combines diatonic chord triggers with a frequency-sliding lead voice that can simultaneously be activated with a mouse, trackpad, ormobile device's accelerometer/gyroscope.
+**therochord** is a unique web-based musical instrument that turns your computer keyboard and mouse into a expressive chordal accompaniment and theremin-style lead synthesizer. It combines diatonic chord triggers with a frequency-sliding lead voice that can simultaneously be activated with a mouse, trackpad, or mobile device's accelerometer/gyroscope.
+
+I got the idea from buying a $4 numerical keypad at a thrift store and realizing it would be an interesting way to play chords. I couldn't think of any chordal instruments that operate on the "Nashville Number System" (which is how I tend to think of them in my head) so I decided to create one. Once that was working how I liked, I wondered if there was a way to simultaneously play a lead voice without needing to press a lot more buttons. It turns out that the mouse, trackpad, and mobile device's accelerometer/gyroscope are all great for this.
 
 ## How to Launch
 
