@@ -141,6 +141,7 @@ function initAudio() {
   }
 
   appState.isAudioStarted = true;
+  updateInteractionState();
   document.getElementById("start-audio").style.display = 'none';
   document.getElementById("chord-info-container").style.display = 'block';
   Tone.start();
@@ -690,6 +691,29 @@ function updateLayoutUI(isNumpad) {
   }
 }
 
+function updateInteractionState() {
+  const isStarted = appState.isAudioStarted;
+  const selectors = [
+    ".key",
+    ".mod-key",
+    ".np-btn",
+    "#mobile-theremin-btn",
+    "#layout-toggle-btn",
+    "#voice-leading-btn",
+    "#root-note"
+  ];
+
+  selectors.forEach(selector => {
+    document.querySelectorAll(selector).forEach(el => {
+      if (isStarted) {
+        el.classList.remove("disabled-interaction");
+      } else {
+        el.classList.add("disabled-interaction");
+      }
+    });
+  });
+}
+
 document.getElementById("layout-toggle-btn").addEventListener("click", (e) => {
   const numpadInterface = document.getElementById("numpad-interface");
   const isCurrentlyNumpad = numpadInterface.style.display === "block";
@@ -1172,4 +1196,5 @@ window.addEventListener("load", () => {
       subtext.innerText = "(please turn off silent mode on your phone)";
     }
   }
+  updateInteractionState(); // Initialize interaction state
 });

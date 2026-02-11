@@ -800,6 +800,14 @@ select:focus {
   opacity: 1;
 }
 
+/* Interaction Blocking before Audio Start */
+.disabled-interaction {
+  pointer-events: none !important;
+  opacity: 0.3 !important;
+  filter: grayscale(0.8) !important;
+  cursor: default !important;
+}
+
 .theremin-tick {
   position: absolute;
   left: 0;
