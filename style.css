@@ -719,7 +719,7 @@ select:focus {
   #mobile-theremin-btn {
     display: block !important;
     position: absolute; /* Relative to .display or .chord-row */
-    right: 18px; /* Moved further from edge */
+    left: 18px; /* Moved further from edge */
     top: 50%;
     transform: translateY(-50%) !important;
     width: 60px !important;
