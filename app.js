@@ -25,7 +25,9 @@ const appState = {
   modReleaseTimeout: null,
   pendingChordStarts: {},
   voiceLeadingEnabled: true,
-  mobileThereminEnabled: false
+  mobileThereminEnabled: false,
+  keyChangeKPending: false,  // k + number/0/-/+ to change key
+  keyChangeKTimeout: null
 };
 
 // modifier keys
@@ -190,7 +192,7 @@ function getScaleChords(root, scaleType) {
     // Major scale degrees: 1(Maj), 2(min), 3(min), 4(Maj), 5(Maj), 6(min), 7(dim)
     // We can infer from the intervals or just hardcode for Major scale for now?
     // Let's use Tonal's detection to check "m", "dim", etc in the detected name
-    // Or just look at intervals. 
+    // Or just look at intervals.
     // Triads: [1P, 3M, 5P] -> Major, [1P, 3m, 5P] -> Minor, [1P, 3m, 5d] -> Dim
 
     // Simple Heuristic for Diatonic Triads
@@ -721,11 +723,65 @@ document.getElementById("layout-toggle-btn").addEventListener("click", (e) => {
   e.target.blur();
 });
 
+/** Max ms to wait for the second key (1–9, 0, -, +) after pressing k. After this, the combo is cancelled so number keys go back to playing chords. */
+const KEY_CHANGE_COMBO_MS = 1500;
 
+// k + number: 1=C, 2=Db, 3=D, 4=Eb, 5=E, 6=F, 7=Gb, 8=G, 9=Ab, 0=A, -=Bb, +=B
+const KEY_CHANGE_COMBO_MAP = {
+  "1": 0,
+  "2": 1,
+  "3": 2,
+  "4": 3,
+  "5": 4,
+  "6": 5,
+  "7": 6,
+  "8": 7,
+  "9": 8,
+  "0": 9,
+  "-": 10,
+  "+": 11,
+  // for good measure -if caps is on by accident
+  "_": 10,
+  "=": 11
+};
+
+function setKeyByIndex(index) {
+  const root = KEY_ORDER[index];
+  if (!root) return;
+  appState.root = root;
+  document.getElementById("root-note").value = root;
+  updateActiveChords();
+  initThereminScale();
+}
 
 // Keyboard Input
 window.addEventListener("keydown", (e) => {
   if (e.repeat) return; // Prevent auto-repeat re-triggering globally
+
+  // Key-change combo: k then 1-9, 0, -, +
+  if (appState.keyChangeKPending) {
+    const idx = KEY_CHANGE_COMBO_MAP[e.key];
+    if (idx !== undefined) {
+      e.preventDefault();
+      clearTimeout(appState.keyChangeKTimeout);
+      appState.keyChangeKPending = false;
+      appState.keyChangeKTimeout = null;
+      setKeyByIndex(idx);
+      return;
+    }
+    appState.keyChangeKPending = false;
+    if (appState.keyChangeKTimeout) clearTimeout(appState.keyChangeKTimeout);
+    appState.keyChangeKTimeout = null;
+  }
+  if (e.key === "k" || e.key === "K") {
+    appState.keyChangeKPending = true;
+    e.preventDefault();
+    appState.keyChangeKTimeout = setTimeout(() => {
+      appState.keyChangeKPending = false;
+      appState.keyChangeKTimeout = null;
+    }, KEY_CHANGE_COMBO_MS);
+    return;
+  }
 
   // Check if key is one of ours
   const isModifier = dominantModifiers.includes(e.key) ||
@@ -1028,7 +1084,7 @@ window.addEventListener("mousedown", (e) => {
   // Only if audio is started
   if (!appState.isAudioStarted) return;
 
-  // Check if clicking interactive elements to avoid conflict? 
+  // Check if clicking interactive elements to avoid conflict?
   // The user requested "Pressing the left mouse button turns on playback".
   // We should probably allow it globally unless clicking a button?
   if (e.target.tagName === 'BUTTON' || e.target.closest('.key') || e.target.closest('.np-btn') || e.target.closest('.mod-key')) return;
