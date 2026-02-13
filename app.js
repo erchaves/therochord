@@ -47,6 +47,14 @@ const minorSixModifiers = ["x", "X"];
 
 const KEY_ORDER = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
+// Tonnetz: (fifth, third) -> chroma. Pitch at (f,t) = (7*f + 4*t) mod 12.
+function tonnetzChroma(f, t) {
+  return ((7 * f + 4 * t) % 12 + 12) % 12;
+}
+function chromaToNoteName(chroma) {
+  return KEY_ORDER[chroma];
+}
+
 // Theremin Constants
 const THEREMIN_MIN_FREQ = 130.81; // C3
 const THEREMIN_MAX_FREQ = 1046.50; // C6
@@ -310,18 +318,10 @@ function getChordWithModifiers(degreeIndex, baseChord) {
   return baseChord;
 }
 
-// Helper: Update Tint
+// Helper: Update Tint (disabled – background no longer changes when playing)
 function updateTint(degreeIndex) {
   if (!chordTint) return;
-
-  if (degreeIndex !== null && degreeIndex >= 0 && degreeIndex < CHORD_TINTS.length) {
-    chordTint.style.backgroundColor = CHORD_TINTS[degreeIndex];
-    chordTint.classList.add("active");
-  } else {
-    // Check if chords are still playing?
-    // In stopChord we will check this.
-    chordTint.classList.remove("active");
-  }
+  chordTint.classList.remove("active");
 }
 
 // Start Chord (Attack)
@@ -410,7 +410,14 @@ function stopChord(degreeIndex) {
 
   const notes = appState.activeVoicings[degreeIndex];
   if (notes) {
-    appState.synth.triggerRelease(notes);
+    // Only release notes not still needed by another held chord (e.g. 7→6 while holding modifier)
+    const otherDegrees = Object.keys(appState.activeVoicings).filter(k => parseInt(k, 10) !== degreeIndex);
+    const notesStillNeeded = new Set();
+    otherDegrees.forEach(k => {
+      (appState.activeVoicings[k] || []).forEach(n => notesStillNeeded.add(n));
+    });
+    const toRelease = notes.filter(n => !notesStillNeeded.has(n));
+    if (toRelease.length > 0) appState.synth.triggerRelease(toRelease);
     delete appState.activeVoicings[degreeIndex];
 
     // Check if any chords left active
@@ -424,6 +431,74 @@ function stopChord(degreeIndex) {
     if (keyEl) keyEl.classList.remove("active");
     const npBtn = document.querySelector(`.np-btn[data-note="${degreeIndex + 1}"]`);
     if (npBtn) npBtn.classList.remove("active");
+  }
+}
+
+const TONNETZ_VOICING_KEY = "tonnetz";
+
+function playTriadFromTonnetz(rootName, isMinor) {
+  if (!appState.isAudioStarted) return;
+  const quality = isMinor ? "m" : "";
+  const chordObj = Chord.get(`${rootName}${quality}`);
+  const baseChord = {
+    root: rootName,
+    notes: chordObj.notes,
+    name: chordObj.name,
+    displayName: `${rootName} ${isMinor ? "Minor" : "Major"}`
+  };
+  let chord = getChordWithModifiers(0, baseChord);
+  const targetNotes = chord.notes;
+  let nextVoicingNotes;
+  if (appState.voiceLeadingEnabled && appState.lastVoicing) {
+    const options = generateVoicingOptions(targetNotes, ["3", "4"]);
+    const limitMidi = note("C5").midi;
+    const validOptions = options.filter(opt => opt.every(n => note(n).midi <= limitMidi));
+    const candidates = validOptions.length > 0 ? validOptions : options;
+    nextVoicingNotes = getBestVoicing(appState.lastVoicing, candidates);
+  } else {
+    nextVoicingNotes = [];
+    let currentOctave = 4;
+    let prevMidi = -1;
+    targetNotes.forEach((n, idx) => {
+      let candidateName = n + currentOctave;
+      let candidateMidi = note(candidateName).midi;
+      if (idx > 0 && candidateMidi <= prevMidi) {
+        currentOctave++;
+        candidateName = n + currentOctave;
+        candidateMidi = note(candidateName).midi;
+      }
+      nextVoicingNotes.push(candidateName);
+      prevMidi = candidateMidi;
+    });
+  }
+  appState.lastVoicing = nextVoicingNotes;
+  const notesObjs = nextVoicingNotes.map(n => note(n));
+  notesObjs.sort((a, b) => a.midi - b.midi);
+  const lowestOctave = notesObjs[0].oct;
+  const bassNote = chord.root + (lowestOctave - 1);
+  const fullVoicing = [...nextVoicingNotes, bassNote];
+  const simpleVoicing = fullVoicing.map(n => Note.simplify(n));
+  const currentVoicing = appState.activeVoicings[TONNETZ_VOICING_KEY] || [];
+  const toRelease = currentVoicing.filter(n => !simpleVoicing.includes(n));
+  const toAttack = simpleVoicing.filter(n => !currentVoicing.includes(n));
+  if (toRelease.length > 0) appState.synth.triggerRelease(toRelease);
+  if (toAttack.length > 0) appState.synth.triggerAttack(toAttack);
+  appState.activeVoicings[TONNETZ_VOICING_KEY] = simpleVoicing;
+  updateTint(0);
+  updateDisplay(chord, simpleVoicing);
+}
+
+function stopTonnetzChord() {
+  if (!appState.isAudioStarted) return;
+  const notes = appState.activeVoicings[TONNETZ_VOICING_KEY];
+  if (notes) {
+    appState.synth.triggerRelease(notes);
+    delete appState.activeVoicings[TONNETZ_VOICING_KEY];
+    if (Object.keys(appState.activeVoicings).length === 0) {
+      updateTint(null);
+      document.getElementById("current-chord").innerText = "—";
+      document.getElementById("notes-display").innerHTML = "";
+    }
   }
 }
 
@@ -669,25 +744,39 @@ document.getElementById("voice-leading-btn").addEventListener("click", (e) => {
   e.target.blur();
 });
 
-function updateLayoutUI(isNumpad) {
+const LAYOUTS = ["tonnetz", "qwerty", "numpad"];
+let currentLayoutIndex = 0;
+
+function updateLayoutUI(layoutName) {
+  const tonnetzInterface = document.getElementById("tonnetz-interface");
   const defaultInterface = document.getElementById("default-interface");
   const numpadInterface = document.getElementById("numpad-interface");
   const toggleBtn = document.getElementById("layout-toggle-btn");
 
-  if (isNumpad) {
-    defaultInterface.style.display = "none";
-    numpadInterface.style.display = "block";
-    if (toggleBtn) {
-      toggleBtn.innerText = "Layout: NUMPAD";
-      toggleBtn.classList.add("active");
-    }
-  } else {
-    defaultInterface.style.display = "block";
-    numpadInterface.style.display = "none";
-    if (toggleBtn) {
-      toggleBtn.innerText = "Layout: QWERTY";
-      toggleBtn.classList.remove("active");
-    }
+  if (layoutName !== "tonnetz") {
+    stopTonnetzChord();
+    tonnetzHeldRows = [];
+    tonnetzHeldCols = [];
+    tonnetzLockedRow = null;
+    tonnetzLockedCol = null;
+    tonnetzShiftLayerActive = false;
+    tonnetzShiftLocked = false;
+    updateTonnetzShiftUI(false, false);
+    document.querySelectorAll(".tonnetz-cell.active").forEach(c => c.classList.remove("active"));
+    updateTonnetzLabelStyles();
+  }
+
+  const show = (el, on) => {
+    if (el) el.style.display = on ? "block" : "none";
+  };
+  show(tonnetzInterface, layoutName === "tonnetz");
+  show(defaultInterface, layoutName === "qwerty");
+  show(numpadInterface, layoutName === "numpad");
+
+  if (toggleBtn) {
+    const labels = { tonnetz: "Layout: Tonnetz", qwerty: "Layout: QWERTY", numpad: "Layout: NUMPAD" };
+    toggleBtn.innerText = labels[layoutName] || "Layout: Tonnetz";
+    toggleBtn.classList.toggle("active", layoutName !== "qwerty");
   }
 }
 
@@ -697,6 +786,7 @@ function updateInteractionState() {
     ".key",
     ".mod-key",
     ".np-btn",
+    ".tonnetz-cell",
     "#mobile-theremin-btn",
     "#layout-toggle-btn",
     "#voice-leading-btn",
@@ -715,11 +805,281 @@ function updateInteractionState() {
 }
 
 document.getElementById("layout-toggle-btn").addEventListener("click", (e) => {
-  const numpadInterface = document.getElementById("numpad-interface");
-  const isCurrentlyNumpad = numpadInterface.style.display === "block";
-  updateLayoutUI(!isCurrentlyNumpad);
+  currentLayoutIndex = (currentLayoutIndex + 1) % LAYOUTS.length;
+  updateLayoutUI(LAYOUTS[currentLayoutIndex]);
   e.target.blur();
 });
+
+// -------------------------------------------------------------------
+// Tonnetz Board
+// -------------------------------------------------------------------
+const TONNETZ_F_MIN = -2;
+const TONNETZ_F_MAX = 5;
+const TONNETZ_T_MIN = -1;
+const TONNETZ_T_MAX = 4;
+const TONNETZ_UNIT = 42;
+const TONNETZ_LABEL_LEFT = 28;
+const TONNETZ_LABEL_TOP = 24;
+
+const TONNETZ_X_OFF = (-TONNETZ_F_MIN + -0.5 * TONNETZ_T_MIN) * TONNETZ_UNIT;
+
+// Row keys (top to bottom): row 0 = t=4, row 5 = t=-1
+const TONNETZ_ROW_KEYS = ["q", "w", "e", "r", "t", "y"];
+const TONNETZ_COL_COUNT = TONNETZ_F_MAX - TONNETZ_F_MIN + 1; // 8
+
+// Map (f,t) -> { majorCell, minorCell } for keyboard play
+let tonnetzCellMap = new Map();
+
+function tonnetzToPx(f, t) {
+  const x = (f + 0.5 * t) * TONNETZ_UNIT + TONNETZ_X_OFF + TONNETZ_LABEL_LEFT;
+  const y = (TONNETZ_T_MAX - t) * TONNETZ_UNIT + TONNETZ_LABEL_TOP;
+  return { x, y };
+}
+
+function initTonnetzBoard() {
+  const container = document.getElementById("tonnetz-board");
+  if (!container) return;
+
+  container.innerHTML = "";
+  tonnetzCellMap.clear();
+
+  const contentW = (TONNETZ_F_MAX - TONNETZ_F_MIN + 1.5) * TONNETZ_UNIT + TONNETZ_X_OFF;
+  const contentH = (TONNETZ_T_MAX - TONNETZ_T_MIN + 1) * TONNETZ_UNIT;
+  const w = contentW + TONNETZ_LABEL_LEFT + 12;
+  const h = contentH + TONNETZ_LABEL_TOP + 8;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${Math.ceil(w)} ${Math.ceil(h)}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+  // Column labels (1, 2, 3, ... 8) centered above the top row of triangles (t = TONNETZ_T_MAX)
+  const colLabelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  colLabelG.setAttribute("class", "tonnetz-col-labels");
+  const topRowT = TONNETZ_T_MAX;
+  for (let i = 0; i < TONNETZ_COL_COUNT; i++) {
+    const f = TONNETZ_F_MIN + i;
+    const cx = TONNETZ_LABEL_LEFT + (f + 0.5 * topRowT + 0.5) * TONNETZ_UNIT + TONNETZ_X_OFF;
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", cx);
+    text.setAttribute("y", 4);
+    text.setAttribute("class", "tonnetz-axis-label tonnetz-col-label");
+    text.setAttribute("data-col", String(i + 1));
+    text.textContent = String(i + 1);
+    colLabelG.appendChild(text);
+  }
+  svg.appendChild(colLabelG);
+
+  // Row labels (q, w, e, r, t, y) next to the first triangle of each row (leftmost vertex at f = F_MIN)
+  const rowLabelG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  rowLabelG.setAttribute("class", "tonnetz-row-labels");
+  const rowLabelGap = 20;
+  for (let i = 0; i < TONNETZ_ROW_KEYS.length; i++) {
+    const t = TONNETZ_T_MAX - i;
+    const firstTriangleX = TONNETZ_LABEL_LEFT + (TONNETZ_F_MIN + 0.5 * t) * TONNETZ_UNIT + TONNETZ_X_OFF;
+    const cx = firstTriangleX - rowLabelGap;
+    const cy = TONNETZ_LABEL_TOP + (TONNETZ_T_MAX - t) * TONNETZ_UNIT - TONNETZ_UNIT / 2;
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", cx);
+    text.setAttribute("y", cy);
+    text.setAttribute("class", "tonnetz-axis-label tonnetz-row-label");
+    text.setAttribute("data-row", String(i));
+    text.textContent = TONNETZ_ROW_KEYS[i];
+    rowLabelG.appendChild(text);
+  }
+  svg.appendChild(rowLabelG);
+
+  const majorLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  majorLayer.setAttribute("class", "tonnetz-layer-major");
+  const minorLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  minorLayer.setAttribute("class", "tonnetz-layer-minor");
+
+  const majorCells = [];
+  const minorCells = [];
+
+  for (let t = TONNETZ_T_MIN; t <= TONNETZ_T_MAX; t++) {
+    for (let f = TONNETZ_F_MIN; f <= TONNETZ_F_MAX; f++) {
+      const rootChroma = tonnetzChroma(f, t);
+      const rootName = chromaToNoteName(rootChroma);
+      const key = `${f},${t}`;
+
+      const majorV = [
+        tonnetzToPx(f, t),
+        tonnetzToPx(f, t + 1),
+        tonnetzToPx(f + 1, t)
+      ];
+      const majorPoints = majorV.map(p => `${p.x},${p.y}`).join(" ");
+      const majorPoly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      majorPoly.setAttribute("points", majorPoints);
+      majorPoly.setAttribute("class", "tonnetz-cell major");
+      majorPoly.setAttribute("data-root", rootName);
+      majorPoly.setAttribute("data-f", String(f));
+      majorPoly.setAttribute("data-t", String(t));
+      majorPoly.setAttribute("data-quality", "major");
+      majorPoly.setAttribute("aria-label", `${rootName} major`);
+      majorCells.push({ el: majorPoly, rootName, isMinor: false, f, t });
+
+      const minorV = [
+        tonnetzToPx(f, t),
+        tonnetzToPx(f - 1, t + 1),
+        tonnetzToPx(f + 1, t)
+      ];
+      const minorPoints = minorV.map(p => `${p.x},${p.y}`).join(" ");
+      const minorPoly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      minorPoly.setAttribute("points", minorPoints);
+      minorPoly.setAttribute("class", "tonnetz-cell minor");
+      minorPoly.setAttribute("data-root", rootName);
+      minorPoly.setAttribute("data-f", String(f));
+      minorPoly.setAttribute("data-t", String(t));
+      minorPoly.setAttribute("data-quality", "minor");
+      minorPoly.setAttribute("aria-label", `${rootName} minor`);
+      minorCells.push({ el: minorPoly, rootName, isMinor: true, f, t });
+
+      tonnetzCellMap.set(key, { majorCell: majorPoly, minorCell: minorPoly, rootName });
+    }
+  }
+
+  majorLayer.append(...majorCells.map(({ el }) => el));
+  minorLayer.append(...minorCells.map(({ el }) => el));
+  svg.appendChild(majorLayer);
+  svg.appendChild(minorLayer);
+
+  const allCells = [...majorCells, ...minorCells];
+  allCells.forEach(({ el, rootName, isMinor }) => {
+    const start = (e) => {
+      e.preventDefault();
+      promptForAudioEngine(() => {
+        playTriadFromTonnetz(rootName, isMinor);
+        document.querySelectorAll(".tonnetz-cell.active").forEach(c => c.classList.remove("active"));
+        el.classList.add("active");
+      });
+    };
+    const stop = (e) => {
+      e.preventDefault();
+      stopTonnetzChord();
+      el.classList.remove("active");
+    };
+    el.addEventListener("mousedown", start);
+    el.addEventListener("mouseup", stop);
+    el.addEventListener("mouseleave", stop);
+    el.addEventListener("touchstart", start, { passive: false });
+    el.addEventListener("touchend", stop, { passive: false });
+  });
+
+  container.appendChild(svg);
+}
+
+// Tonnetz: play triangle at (f, t); isMinor = true -> minor (green), false -> major (purple)
+function playTonnetzAtCoord(f, t, isMinor) {
+  const key = `${f},${t}`;
+  const rec = tonnetzCellMap.get(key);
+  if (!rec) return;
+  const el = isMinor ? rec.minorCell : rec.majorCell;
+  playTriadFromTonnetz(rec.rootName, isMinor);
+  document.querySelectorAll(".tonnetz-cell.active").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+}
+
+// Tonnetz keyboard: chord = last-pressed row + last-pressed col (arrays keep order).
+let tonnetzHeldRows = [];
+let tonnetzHeldCols = [];
+let tonnetzShiftLayerActive = false;
+let tonnetzShiftLocked = false;
+let lastShiftKeyDown = 0;
+let tonnetzLockedRow = null;
+let tonnetzLockedCol = null;
+const TONNETZ_DOUBLE_PRESS_MS = 400;
+let lastTonnetzRowDown = { key: null, time: 0 };
+let lastTonnetzColDown = { key: null, time: 0 };
+
+function tonnetzActiveRow() {
+  if (tonnetzLockedRow !== null) return tonnetzLockedRow;
+  return tonnetzHeldRows.length ? tonnetzHeldRows[tonnetzHeldRows.length - 1] : null;
+}
+function tonnetzActiveCol() {
+  if (tonnetzLockedCol !== null) return tonnetzLockedCol;
+  return tonnetzHeldCols.length ? tonnetzHeldCols[tonnetzHeldCols.length - 1] : null;
+}
+function removeLastFromArray(arr, value) {
+  const i = arr.lastIndexOf(value);
+  if (i >= 0) arr.splice(i, 1);
+}
+
+function isTonnetzLayoutActive() {
+  const el = document.getElementById("tonnetz-interface");
+  return el && el.style.display !== "none";
+}
+
+function updateTonnetzShiftUI(shiftHeld, shiftLocked) {
+  const iface = document.getElementById("tonnetz-interface");
+  const hint = document.getElementById("tonnetz-shift-hint");
+  if (!iface || !hint) return;
+  const active = !!shiftHeld || !!shiftLocked;
+  iface.classList.toggle("tonnetz-shift-active", !!active);
+  iface.classList.toggle("tonnetz-shift-locked", !!shiftLocked);
+  // Green (minor) layer stays on top so it takes precedence; purple is only clickable where only purple is visible
+  const span = hint.querySelector(".tonnetz-shift-hint-text");
+  if (span) {
+    if (shiftLocked) {
+      span.textContent = "Purple (major) locked. Double-press Shift to unlock.";
+    } else {
+      span.textContent = shiftHeld
+        ? "Purple (major) on top. Release Shift for green (minor)."
+        : "Green (minor) on top. Hold Shift for purple (major).";
+    }
+  }
+}
+
+// Re-examine held keys and update sound + active cell. Chord = last-pressed row + last-pressed col.
+function applyTonnetzState() {
+  if (!isTonnetzLayoutActive()) return;
+  document.querySelectorAll(".tonnetz-cell.active").forEach(c => c.classList.remove("active"));
+  const activeRow = tonnetzActiveRow();
+  const activeCol = tonnetzActiveCol();
+  if (activeRow !== null && activeCol !== null && appState.isAudioStarted) {
+    const f = (activeCol - 1) + TONNETZ_F_MIN;
+    const t = TONNETZ_T_MAX - activeRow;
+    const isMinor = !tonnetzShiftLayerActive;
+    promptForAudioEngine(() => {
+      playTonnetzAtCoord(f, t, isMinor);
+    });
+  } else {
+    stopTonnetzChord();
+  }
+  updateTonnetzLabelStyles();
+}
+
+function updateTonnetzLabelStyles() {
+  const board = document.getElementById("tonnetz-board");
+  if (!board) return;
+  const activeRow = tonnetzActiveRow();
+  const activeCol = tonnetzActiveCol();
+  board.querySelectorAll(".tonnetz-row-label").forEach(el => {
+    const row = parseInt(el.getAttribute("data-row"), 10);
+    el.classList.remove("tonnetz-label-playing", "tonnetz-label-locked");
+    if (activeRow === row) {
+      el.classList.add(tonnetzLockedRow === row ? "tonnetz-label-locked" : "tonnetz-label-playing");
+    }
+  });
+  board.querySelectorAll(".tonnetz-col-label").forEach(el => {
+    const col = parseInt(el.getAttribute("data-col"), 10);
+    el.classList.remove("tonnetz-label-playing", "tonnetz-label-locked");
+    if (activeCol === col) {
+      el.classList.add(tonnetzLockedCol === col ? "tonnetz-label-locked" : "tonnetz-label-playing");
+    }
+  });
+}
+
+function getTonnetzRowIndex(key) {
+  const k = key.toLowerCase();
+  const i = TONNETZ_ROW_KEYS.indexOf(k);
+  return i >= 0 ? i : null;
+}
+
+function getTonnetzColFromKey(key) {
+  const num = parseInt(key, 10);
+  if (num >= 1 && num <= TONNETZ_COL_COUNT) return num;
+  return null;
+}
 
 
 
@@ -764,6 +1124,53 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && helpModal.style.display === "flex") {
     helpModal.style.display = "none";
     return;
+  }
+
+  // Tonnetz layout: hold Shift = major on top, release = minor. Double-press Shift = lock.
+  if (isTonnetzLayoutActive()) {
+    if (e.key === "Shift") {
+      e.preventDefault();
+      const now = Date.now();
+      const isDouble = (now - lastShiftKeyDown) < TONNETZ_DOUBLE_PRESS_MS;
+      lastShiftKeyDown = now;
+      if (isDouble) {
+        tonnetzShiftLocked = !tonnetzShiftLocked;
+        tonnetzShiftLayerActive = tonnetzShiftLocked;
+      } else {
+        tonnetzShiftLayerActive = true;
+      }
+      updateTonnetzShiftUI(tonnetzShiftLayerActive, tonnetzShiftLocked);
+      applyTonnetzState();
+      return;
+    }
+    const rowIdx = getTonnetzRowIndex(e.key);
+    const colNum = getTonnetzColFromKey(e.key);
+    if (rowIdx !== null) {
+      e.preventDefault();
+      const now = Date.now();
+      const isDouble = lastTonnetzRowDown.key === rowIdx && (now - lastTonnetzRowDown.time) < TONNETZ_DOUBLE_PRESS_MS;
+      lastTonnetzRowDown = { key: rowIdx, time: now };
+      if (isDouble) {
+        tonnetzLockedRow = tonnetzLockedRow === rowIdx ? null : rowIdx;
+      } else {
+        tonnetzHeldRows.push(rowIdx);
+      }
+      applyTonnetzState();
+      return;
+    }
+    if (colNum !== null) {
+      e.preventDefault();
+      const now = Date.now();
+      const isDouble = lastTonnetzColDown.key === colNum && (now - lastTonnetzColDown.time) < TONNETZ_DOUBLE_PRESS_MS;
+      lastTonnetzColDown = { key: colNum, time: now };
+      if (isDouble) {
+        tonnetzLockedCol = tonnetzLockedCol === colNum ? null : colNum;
+      } else {
+        tonnetzHeldCols.push(colNum);
+      }
+      applyTonnetzState();
+      return;
+    }
   }
 
   if (isModifier || isNoteKey) {
@@ -815,6 +1222,31 @@ window.addEventListener("keydown", (e) => {
 });
 
 window.addEventListener("keyup", (e) => {
+  // Tonnetz layout: release row/col or Shift updates state (hold Shift = major on top)
+  if (isTonnetzLayoutActive()) {
+    if (e.key === "Shift") {
+      if (!tonnetzShiftLocked) tonnetzShiftLayerActive = false;
+      updateTonnetzShiftUI(tonnetzShiftLayerActive, tonnetzShiftLocked);
+      e.preventDefault();
+      applyTonnetzState();
+      return;
+    }
+    const rowIdx = getTonnetzRowIndex(e.key);
+    const colNum = getTonnetzColFromKey(e.key);
+    if (rowIdx !== null) {
+      e.preventDefault();
+      removeLastFromArray(tonnetzHeldRows, rowIdx);
+      applyTonnetzState();
+      return;
+    }
+    if (colNum !== null) {
+      e.preventDefault();
+      removeLastFromArray(tonnetzHeldCols, colNum);
+      applyTonnetzState();
+      return;
+    }
+  }
+
   let modChanged = false;
   // Modifiers tracking
   if (dominantModifiers.includes(e.key)) { setModifier("dominant", false); }
@@ -1187,22 +1619,23 @@ function updateThereminVisualsFromNormalized(normalized) {
   pitchIndicator.style.bottom = 'auto';
   pitchIndicator.style.transform = 'translate(-50%, -50%)';
 }
-// Initialize Layout Default
+// Initialize Layout Default (Tonnetz first) and Tonnetz board
 window.addEventListener("load", () => {
-  // Detect motion sensor / touch support for Theremin button
+  updateLayoutUI("tonnetz");
+  currentLayoutIndex = 0;
+  initTonnetzBoard();
+
   const hasMotion = typeof DeviceOrientationEvent !== 'undefined' || typeof DeviceMotionEvent !== 'undefined';
   const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
   if (hasMotion && hasTouch) {
     document.body.classList.add("has-accel");
   }
 
   if (window.innerWidth < 600) {
-    updateLayoutUI(true);
     const subtext = document.getElementById("start-audio-subtext");
     if (subtext) {
       subtext.innerText = "(please turn off silent mode on your phone)";
     }
   }
-  updateInteractionState(); // Initialize interaction state
+  updateInteractionState();
 });

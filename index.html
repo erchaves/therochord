@@ -51,7 +51,7 @@
           Voice Leading: ON
         </button>
         <button class="control-btn" id="layout-toggle-btn">
-          Layout: QWERTY
+          Layout: Tonnetz
         </button>
       </div>
 
@@ -76,8 +76,8 @@
         </div>
       </div>
 
-      <!-- Default Interface (Horizontal Keys + Instructions) -->
-      <div id="default-interface">
+      <!-- QWERTY Keys + Instructions (Layout: QWERTY) -->
+      <div id="default-interface" style="display: none">
         <div class="keypad">
           <div class="key" data-note="1">
             <span class="key-label">1</span>
@@ -221,7 +221,16 @@
         </div>
       </div>
 
-      <!-- Alternate Numpad Interface (Hidden by Default) -->
+      <!-- Tonnetz Board (Default chord input) -->
+      <div id="tonnetz-interface" class="tonnetz-interface-wrap">
+        <span class="tonnetz-shift-label" aria-hidden="true">shift</span>
+        <p class="tonnetz-shift-hint" id="tonnetz-shift-hint" aria-live="polite">
+          <span class="tonnetz-shift-hint-text">Green (minor) on top. Hold <kbd>Shift</kbd> for purple (major).</span>
+        </p>
+        <div id="tonnetz-board" class="tonnetz-svg-wrap" aria-label="Tonnetz chord lattice"></div>
+      </div>
+
+      <!-- Numpad Interface (Layout: NUMPAD) -->
       <div id="numpad-interface" style="display: none">
         <div class="numpad-grid">
           <!-- Row 1 -->
