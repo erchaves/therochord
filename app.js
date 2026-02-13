@@ -1194,6 +1194,10 @@ window.addEventListener("keydown", (e) => {
     const colNum = getTonnetzColFromKey(e.key);
     if (rowIdx !== null) {
       e.preventDefault();
+      // Selecting a new row unlocks the row dimension
+      if (tonnetzLockedRow !== null && rowIdx !== tonnetzLockedRow) {
+        tonnetzLockedRow = null;
+      }
       const now = Date.now();
       const isDouble = lastTonnetzRowDown.key === rowIdx && (now - lastTonnetzRowDown.time) < TONNETZ_DOUBLE_PRESS_MS;
       lastTonnetzRowDown = { key: rowIdx, time: now };
@@ -1207,6 +1211,10 @@ window.addEventListener("keydown", (e) => {
     }
     if (colNum !== null) {
       e.preventDefault();
+      // Selecting a new col unlocks the col dimension
+      if (tonnetzLockedCol !== null && colNum !== tonnetzLockedCol) {
+        tonnetzLockedCol = null;
+      }
       const now = Date.now();
       const isDouble = lastTonnetzColDown.key === colNum && (now - lastTonnetzColDown.time) < TONNETZ_DOUBLE_PRESS_MS;
       lastTonnetzColDown = { key: colNum, time: now };
