@@ -6,6 +6,8 @@
   --key-bg: #2c2c2c;
   --key-active: #bb86fc;
   --key-text: #ffffff;
+  /* Tonnetz overall scale (1 = 100%, 0.9 = 90%, 1.1 = 110%) */
+  --tonnetz-scale: 1;
 }
 
 body {
@@ -584,6 +586,8 @@ select:focus {
   width: 100%;
   max-width: min(560px, 92vw);
   aspect-ratio: 1.15;
+  transform: scale(var(--tonnetz-scale));
+  transform-origin: center center;
 }
 
 .tonnetz-svg-wrap svg {

@@ -198,7 +198,7 @@ function getScaleChords(root, scaleType) {
     // Major scale degrees: 1(Maj), 2(min), 3(min), 4(Maj), 5(Maj), 6(min), 7(dim)
     // We can infer from the intervals or just hardcode for Major scale for now?
     // Let's use Tonal's detection to check "m", "dim", etc in the detected name
-    // Or just look at intervals. 
+    // Or just look at intervals.
     // Triads: [1P, 3M, 5P] -> Major, [1P, 3m, 5P] -> Minor, [1P, 3m, 5d] -> Dim
 
     // Simple Heuristic for Diatonic Triads
@@ -820,6 +820,9 @@ const TONNETZ_T_MAX = 4;
 const TONNETZ_UNIT = 42;
 const TONNETZ_LABEL_LEFT = 28;
 const TONNETZ_LABEL_TOP = 24;
+// Push triangles and row labels down so they clear the column number row (1–8)
+// This needs to be added back to the whole conatiner so the thermain note is still accurate
+const TONNETZ_CONTENT_OFFSET_Y = 30;
 
 const TONNETZ_X_OFF = (-TONNETZ_F_MIN + -0.5 * TONNETZ_T_MIN) * TONNETZ_UNIT;
 
@@ -861,7 +864,7 @@ function initTonnetzBoard() {
     const cx = TONNETZ_LABEL_LEFT + (f + 0.5 * topRowT + 0.5) * TONNETZ_UNIT + TONNETZ_X_OFF;
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
     text.setAttribute("x", cx);
-    text.setAttribute("y", 4);
+    text.setAttribute("y", 4 - TONNETZ_CONTENT_OFFSET_Y);
     text.setAttribute("class", "tonnetz-axis-label tonnetz-col-label");
     text.setAttribute("data-col", String(i + 1));
     text.textContent = String(i + 1);
@@ -1460,7 +1463,7 @@ window.addEventListener("mousedown", (e) => {
   // Only if audio is started
   if (!appState.isAudioStarted) return;
 
-  // Check if clicking interactive elements to avoid conflict? 
+  // Check if clicking interactive elements to avoid conflict?
   // The user requested "Pressing the left mouse button turns on playback".
   // We should probably allow it globally unless clicking a button?
   if (e.target.tagName === 'BUTTON' || e.target.closest('.key') || e.target.closest('.np-btn') || e.target.closest('.mod-key')) return;
