@@ -6,6 +6,8 @@
   --key-bg: #2c2c2c;
   --key-active: #bb86fc;
   --key-text: #ffffff;
+  /* Tonnetz overall scale (1 = 100%, 0.9 = 90%, 1.1 = 110%) */
+  --tonnetz-scale: 1;
 }
 
 body {
@@ -514,6 +516,147 @@ select:focus {
 
 .key.active .mod-name {
   color: var(--primary-color);
+}
+
+/* Tonnetz Board */
+.tonnetz-interface-wrap {
+  margin: 1rem 0 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+#tonnetz-interface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* "shift" in top left, axonometric 3D (receding into screen) */
+.tonnetz-shift-label {
+  position: absolute;
+  top: 75px;
+  left: 50px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: lowercase;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  transform-origin: left top;
+  transform: perspective(500px) rotateX(12deg) rotateY(42deg);
+  backface-visibility: hidden;
+  transition: color 0.15s ease;
+}
+
+#tonnetz-interface.tonnetz-shift-active .tonnetz-shift-label {
+  color: #00ff88;
+}
+
+#tonnetz-interface.tonnetz-shift-locked .tonnetz-shift-label {
+  color: #00cc66;
+}
+
+.tonnetz-shift-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  color: var(--text-color);
+}
+
+.tonnetz-shift-hint kbd {
+  background: var(--key-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.85em;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#tonnetz-interface.tonnetz-shift-active .tonnetz-shift-hint-text {
+  color: var(--primary-color);
+}
+
+.tonnetz-svg-wrap {
+  width: 100%;
+  max-width: min(560px, 92vw);
+  aspect-ratio: 1.15;
+  transform: scale(var(--tonnetz-scale));
+  transform-origin: center center;
+}
+
+.tonnetz-svg-wrap svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Z-order: default = minor (green) on top; Shift = major (purple) on top */
+/* Both layers get clicks; the one on top is determined by DOM order (updated when Shift is held) */
+.tonnetz-layer-major,
+.tonnetz-layer-minor {
+  pointer-events: auto;
+}
+
+.tonnetz-cell {
+  cursor: pointer;
+  transition: fill 0.1s ease, filter 0.1s ease;
+}
+
+.tonnetz-cell:hover {
+  filter: brightness(1.2);
+}
+
+.tonnetz-cell.major {
+  fill: rgba(187, 134, 252, 0.35);
+  stroke: rgba(187, 134, 252, 0.6);
+  stroke-width: 1;
+}
+
+.tonnetz-cell.minor {
+  fill: rgba(3, 218, 198, 0.25);
+  stroke: rgba(3, 218, 198, 0.55);
+  stroke-width: 1;
+}
+
+.tonnetz-cell.active {
+  fill: rgba(187, 134, 252, 0.7);
+  stroke: var(--key-active);
+  filter: brightness(1.15);
+}
+
+.tonnetz-cell.minor.active {
+  fill: rgba(3, 218, 198, 0.55);
+}
+
+.tonnetz-axis-label {
+  font-size: 11px;
+  fill: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  transition: fill 0.15s ease;
+}
+
+.tonnetz-axis-label.row {
+  text-anchor: end;
+}
+
+/* Active note: label turns green when that row/col is playing */
+.tonnetz-axis-label.tonnetz-label-playing {
+  fill: #00ff88;
+}
+
+/* Locked dimension: distinct green when row/col is locked */
+.tonnetz-axis-label.tonnetz-label-locked {
+  fill: #00cc66;
 }
 
 .instructions {
